@@ -1,0 +1,8 @@
+[build]
+# On Windows/MSVC `ct2rs` builds some C++ objects with the static CRT (/MT),
+# while `rustc` defaults to the dynamic CRT (/MD). This mismatch causes:
+#   LNK2038: RuntimeLibrary: MT_StaticRelease vs MD_DynamicRelease
+#
+# Forcing static CRT for the Rust side keeps MSVC runtime library consistent.
+rustflags = ["-C", "target-feature=+crt-static"]
+

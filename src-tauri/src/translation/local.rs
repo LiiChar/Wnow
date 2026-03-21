@@ -1,0 +1,193 @@
+
+
+use std::path::PathBuf;
+
+use std::sync::{Arc, Mutex};
+
+use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
+use ct2rs::{Config as Ct2rsConfig, TranslationOptions};
+use ct2rs::tokenizers::auto::Tokenizer as AutoTokenizer;
+use ct2rs::Translator;
+
+use crate::get_resource_dir;
+
+/// Информация о языковой модели
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelInfo {
+    pub id: String,
+    pub name: String,
+    pub source_lang: String,
+    pub target_lang: String,
+    pub size_mb: u64,
+    pub url: String,
+    pub local_path: Option<PathBuf>,
+    pub is_downloaded: bool,
+}
+
+
+static ACTIVE_MODEL: Lazy<Arc<Mutex<Option<String>>>> = Lazy::new(|| Arc::new(Mutex::new(None)));
+
+
+/// Простая локальная реализация перевода на основе словаря с морфологией
+/// Используется как fallback когда нет нейросетевых моделей
+pub mod simple {
+    use std::collections::HashMap;
+
+    /// Простой локальный переводчик на основе словаря
+    pub struct SimpleTranslator {
+        dict_en_ru: HashMap<String, String>,
+        dict_ru_en: HashMap<String, String>,
+    }
+
+    impl SimpleTranslator {
+        pub fn new() -> Self {
+            let mut dict_en_ru = HashMap::new();
+            let mut dict_ru_en = HashMap::new();
+
+            // Загружаем базовый словарь (можно расширить)
+            Self::load_basic_dict(&mut dict_en_ru, &mut dict_ru_en);
+
+            SimpleTranslator { dict_en_ru, dict_ru_en }
+        }
+
+        fn load_basic_dict(en_ru: &mut HashMap<String, String>, ru_en: &mut HashMap<String, String>) {
+            // Основная база для одиночных слов берётся из `resources/dictionary/*.json`.
+            // Для ключей делаем lowercase, чтобы поиск был case-insensitive.
+            let raw_en_ru: HashMap<String, String> = serde_json::from_str(
+                include_str!("../../resources/dictionary/en_ru.json"),
+            )
+            .unwrap_or_default();
+            for (k, v) in raw_en_ru {
+                en_ru.entry(k.to_lowercase()).or_insert(v);
+            }
+
+            let raw_ru_en: HashMap<String, String> = serde_json::from_str(
+                include_str!("../../resources/dictionary/ru_en.json"),
+            )
+            .unwrap_or_default();
+            for (k, v) in raw_ru_en {
+                ru_en.entry(k.to_lowercase()).or_insert(v);
+            }
+        }
+
+        /// Переводит слово
+        pub fn translate_word(&self, word: &str, from: &str, to: &str) -> Option<String> {
+            let word_lower = word.to_lowercase();
+            
+            if from == "en" && to == "ru" {
+                self.dict_en_ru.get(&word_lower).cloned()
+            } else if from == "ru" && to == "en" {
+                self.dict_ru_en.get(&word_lower).cloned()
+            } else {
+                None
+            }
+        }
+
+        /// Переводит текст пословно
+        pub fn translate_text(&self, text: &str, from: &str, to: &str) -> String {
+            let words: Vec<&str> = text.split_whitespace().collect();
+            let translated: Vec<String> = words
+                .iter()
+                .map(|w| {
+                    // Сохраняем пунктуацию
+                    let (word, punct) = Self::split_punctuation(w);
+                    let translated = self.translate_word(&word, from, to)
+                        .unwrap_or_else(|| word.to_string());
+                    format!("{}{}", translated, punct)
+                })
+                .collect();
+            
+            translated.join(" ")
+        }
+
+        fn split_punctuation(word: &str) -> (String, String) {
+            let punct_chars: &[char] = &['.', ',', '!', '?', ';', ':', '"', '\'', '(', ')', '[', ']', '{', '}'];
+            let mut main = word.to_string();
+            let mut punct = String::new();
+            
+            while main.ends_with(punct_chars) {
+                if let Some(c) = main.pop() {
+                    punct.insert(0, c);
+                }
+            }
+            
+            (main, punct)
+        }
+    }
+
+    impl Default for SimpleTranslator {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+}
+
+/// Глобальный экземпляр простого переводчика
+static SIMPLE_TRANSLATOR: Lazy<simple::SimpleTranslator> = Lazy::new(simple::SimpleTranslator::new);
+
+type AutoCt2rsTranslator = Translator<AutoTokenizer>;
+static CT2RS_ACTIVE_TRANSLATOR: Lazy<Mutex<Option<(String, AutoCt2rsTranslator)>>> =
+    Lazy::new(|| Mutex::new(None));
+
+fn ct2rs_model_id(from: &str, to: &str) -> Option<&'static str> {
+    match (from, to) {
+        ("en", "ru") => Some("en-ru"),
+        ("ru", "en") => Some("ru-en"),
+        _ => None,
+    }
+}
+
+
+pub fn translate_local_translator(
+    text: &str,
+    from: &str,
+    to: &str,
+) -> Result<String, String> {
+    let model_id = ct2rs_model_id(from, to)
+        .ok_or_else(|| format!("Unsupported language pair: {} -> {}", from, to))?;
+
+    let root_dir = get_resource_dir().join("translate-model");
+
+    let model_path = root_dir.join(model_id);
+    if !model_path.exists() {
+        return Err(format!("Model {} not downloaded", model_id));
+    }
+
+    let mut guard = CT2RS_ACTIVE_TRANSLATOR.lock().map_err(|e| e.to_string())?;
+    let needs_restart = guard.as_ref().map(|(id, _)| id != model_id).unwrap_or(true);
+    if needs_restart {
+        let translator = AutoCt2rsTranslator::new(&model_path, &Ct2rsConfig::default())
+            .map_err(|e| e.to_string())?;
+        *guard = Some((model_id.to_string(), translator));
+    }
+
+    let translator = &guard
+        .as_mut()
+        .ok_or_else(|| "Translator not available".to_string())?
+        .1;
+
+    let options = TranslationOptions {
+        beam_size: 1,
+        ..Default::default()
+    };
+    let sources = vec![text];
+    let results = translator
+        .translate_batch(&sources, &options, None)
+        .map_err(|e| e.to_string())?;
+
+    Ok(results
+        .first()
+        .map(|(s, _)| s.clone())
+        .unwrap_or_else(|| String::new()))
+}
+
+
+pub fn translate_local_simple(text: &str, from: &str, to: &str) -> String {
+    SIMPLE_TRANSLATOR.translate_text(text, from, to)
+}
+
+pub fn translate_word_local(word: &str, from: &str, to: &str) -> Option<String> {
+    SIMPLE_TRANSLATOR.translate_word(word, from, to)
+}
+

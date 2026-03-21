@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Wnow Icon Generator</title>
+  <style>
+    body { 
+      display: flex; 
+      flex-direction: column;
+      align-items: center; 
+      justify-content: center; 
+      min-height: 100vh; 
+      background: #1a1a2e; 
+      font-family: system-ui;
+      gap: 20px;
+    }
+    .preview {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .icon-container {
+      text-align: center;
+      color: white;
+    }
+    canvas {
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    button {
+      padding: 12px 24px;
+      font-size: 16px;
+      background: linear-gradient(135deg, #3b82f6, #06b6d4);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    button:hover {
+      opacity: 0.9;
+    }
+    h1 { color: white; margin-bottom: 20px; }
+    p { color: #888; }
+  </style>
+</head>
+<body>
+  <h1>Wnow Icon Generator</h1>
+  <div class="preview">
+    <div class="icon-container">
+      <canvas id="c256" width="256" height="256"></canvas>
+      <p>256x256</p>
+    </div>
+    <div class="icon-container">
+      <canvas id="c128" width="128" height="128"></canvas>
+      <p>128x128</p>
+    </div>
+    <div class="icon-container">
+      <canvas id="c32" width="32" height="32"></canvas>
+      <p>32x32</p>
+    </div>
+  </div>
+  <button onclick="downloadAll()">Скачать все иконки</button>
+  <p>После скачивания замените файлы в папке src-tauri/icons/</p>
+
+  <script>
+    function drawIcon(canvas) {
+      const ctx = canvas.getContext('2d');
+      const size = canvas.width;
+      const scale = size / 256;
+      
+      // Background gradient
+      const gradient = ctx.createLinearGradient(0, 0, size, size);
+      gradient.addColorStop(0, '#3b82f6');
+      gradient.addColorStop(1, '#06b6d4');
+      
+      // Rounded rectangle background
+      const radius = 48 * scale;
+      ctx.beginPath();
+      ctx.roundRect(0, 0, size, size, radius);
+      ctx.fillStyle = gradient;
+      ctx.fill();
+      
+      // Inner shadow (darker at bottom)
+      const innerGradient = ctx.createLinearGradient(0, 0, 0, size);
+      innerGradient.addColorStop(0, 'rgba(255,255,255,0.15)');
+      innerGradient.addColorStop(1, 'rgba(0,0,0,0.15)');
+      ctx.beginPath();
+      ctx.roundRect(0, 0, size, size, radius);
+      ctx.fillStyle = innerGradient;
+      ctx.fill();
+      
+      // Draw "W" letter
+      ctx.fillStyle = 'white';
+      ctx.font = `bold ${140 * scale}px system-ui, -apple-system, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('W', size / 2, size / 2 + 5 * scale);
+      
+      // Small translate icon hint (bottom right)
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      ctx.lineWidth = 3 * scale;
+      ctx.lineCap = 'round';
+      
+      // Small arrow indicating translation
+      const arrowX = size * 0.75;
+      const arrowY = size * 0.75;
+      const arrowSize = 20 * scale;
+      
+      ctx.beginPath();
+      ctx.moveTo(arrowX - arrowSize, arrowY);
+      ctx.lineTo(arrowX + arrowSize, arrowY);
+      ctx.moveTo(arrowX + arrowSize - 8 * scale, arrowY - 6 * scale);
+      ctx.lineTo(arrowX + arrowSize, arrowY);
+      ctx.lineTo(arrowX + arrowSize - 8 * scale, arrowY + 6 * scale);
+      ctx.stroke();
+    }
+    
+    // Draw all sizes
+    ['c256', 'c128', 'c32'].forEach(id => {
+      drawIcon(document.getElementById(id));
+    });
+    
+    function downloadCanvas(canvas, filename) {
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+    
+    function downloadAll() {
+      downloadCanvas(document.getElementById('c256'), 'icon.png');
+      downloadCanvas(document.getElementById('c256'), '128x128@2x.png');
+      downloadCanvas(document.getElementById('c128'), '128x128.png');
+      downloadCanvas(document.getElementById('c32'), '32x32.png');
+      
+      // For Windows Store icons
+      const sizes = [310, 284, 150, 142, 107, 89, 71, 44, 30];
+      sizes.forEach(s => {
+        const c = document.createElement('canvas');
+        c.width = s;
+        c.height = s;
+        drawIcon(c);
+        setTimeout(() => downloadCanvas(c, `Square${s}x${s}Logo.png`), 100);
+      });
+      
+      alert('Иконки скачаны! Также создайте icon.ico через онлайн конвертер (например icoconvert.com)');
+    }
+  </script>
+</body>
+</html>
+

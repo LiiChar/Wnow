@@ -1,0 +1,68 @@
+// Типы для хранилища
+
+export interface SavedWord {
+  id: number;
+  word: string;
+  translation: string;
+  context: string;
+  context_translation: string;
+  screenshot_path: string | null;
+  source_lang: string;
+  target_lang: string;
+  created_at: number;
+  last_reviewed: number | null;
+  review_count: number;
+  correct_count: number;
+  mastery_level: number;
+  next_review: number | null;
+}
+
+export interface FlashcardWord {
+  id: number;
+  word: string;
+  translation: string;
+  context: string;
+  screenshot_path: string | null;
+  mastery_level: number;
+}
+
+export interface LearningStats {
+  total_words: number;
+  words_learned: number;
+  words_in_progress: number;
+  total_reviews: number;
+  correct_reviews: number;
+  streak_days: number;
+  last_study_date: number | null;
+}
+
+export interface AppSettings {
+  theme: 'light' | 'dark' | 'system';
+  source_lang: string;
+  target_lang: string;
+  hotkey_translate_word: string;
+  hotkey_translate_area: string;
+  hotkey_translate_screen: string;
+  hotkey_translate_clipboard: string;
+  auto_save_words: boolean;
+  show_notifications: boolean;
+  minimize_to_tray: boolean;
+  start_minimized: boolean;
+  start_mode: 'app' | 'overlay'; // Что открывать при запуске
+  is_pro: boolean;
+  pro_expires: number | null;
+}
+
+export const LANGUAGES = [
+  { code: 'en', name: 'English', flag: '🇬🇧' },
+  { code: 'ru', name: 'Русский', flag: '🇷🇺' },
+  { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
+  { code: 'fr', name: 'Français', flag: '🇫🇷' },
+  { code: 'es', name: 'Español', flag: '🇪🇸' },
+  { code: 'it', name: 'Italiano', flag: '🇮🇹' },
+  { code: 'pt', name: 'Português', flag: '🇵🇹' },
+  { code: 'ja', name: '日本語', flag: '🇯🇵' },
+  { code: 'ko', name: '한국어', flag: '🇰🇷' },
+  { code: 'zh', name: '中文', flag: '🇨🇳' },
+];
+
