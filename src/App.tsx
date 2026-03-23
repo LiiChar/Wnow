@@ -2,18 +2,16 @@ import { createSignal, onMount, Show } from "solid-js";
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import "./index.css";
 
-import { TranslatorOverlay } from "./overlay/TranslatorOverlay";
-import { MainApp } from "./app/MainApp";
+import { TranslatorOverlay } from "./widget/overlay/TranslatorOverlay";
 import { initSettings, applyTheme } from "./shared/stores/settings";
+import { Router } from "./app/router/Router";
 
 function App() {
-  // Сразу определяем режим синхронно
   const window_ = getCurrentWebviewWindow();
   const initialMode = window_.label === 'main' ? 'app' : 'overlay';
   
   const [mode] = createSignal<'overlay' | 'app'>(initialMode);
 
-  // Устанавливаем стили сразу
   if (initialMode === 'app') {
     document.body.classList.add('app-mode');
     document.body.style.background = '#0a0a0a';
@@ -22,15 +20,11 @@ function App() {
   }
 
   onMount(() => {
-    console.log('App mounted, label:', window_.label, 'mode:', initialMode);
-    
-    // Загружаем настройки в фоне
     initSettings().then(settings => {
       applyTheme(settings.theme);
     }).catch(console.error);
   });
 
-  // Overlay - открыть main окно
   const handleOpenApp = async () => {
     try {
       const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
@@ -44,19 +38,14 @@ function App() {
     }
   };
 
-  // Main - скрыть окно
-  const handleCloseApp = async () => {
-    try {
-      await window_.hide();
-    } catch (e) {
-      console.error('Failed to hide window:', e);
-    }
-  };
 
   return (
-    <Show when={mode() === 'app'} fallback={<TranslatorOverlay onOpenApp={handleOpenApp} />}>
-      <MainApp onClose={handleCloseApp} />
-    </Show>
+		<Show
+			when={mode() === 'overlay'}
+			fallback={<TranslatorOverlay onOpenApp={handleOpenApp} />}
+		>
+			<Router />
+		</Show>
 	);
 }
 

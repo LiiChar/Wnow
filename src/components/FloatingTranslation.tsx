@@ -83,9 +83,9 @@ export function FloatingTranslation(props: Props) {
           onMouseDown={handleMouseDown}
           onClick={(e) => e.stopPropagation()}
         >
-          <div class="glass-dark rounded-lg border border-neutral-700 shadow-xl overflow-hidden max-w-xs">
+          <div class="glass-dark rounded-lg border border-border shadow-xl overflow-hidden max-w-xs">
             {/* Mini header with drag handle */}
-            <div class="px-2 py-1 border-b border-neutral-700/50 flex items-center gap-1">
+            <div class="px-2 py-1 border-b border-border flex items-center gap-1">
               <div class="flex gap-0.5">
                 <div class="w-1.5 h-1.5 rounded-full bg-neutral-600" />
                 <div class="w-1.5 h-1.5 rounded-full bg-neutral-600" />

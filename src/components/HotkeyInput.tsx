@@ -1,5 +1,5 @@
+import { Keyboard } from 'lucide-solid';
 import { createSignal, Show } from 'solid-js';
-import { IconKeyboard } from './Icons';
 
 interface HotkeyInputProps {
   label: string;
@@ -83,7 +83,7 @@ export function HotkeyInput(props: HotkeyInputProps) {
         >
           <Show when={isRecording()} fallback={
             <>
-              <IconKeyboard size={14} />
+              <Keyboard size={14} />
               {props.value}
             </>
           }>

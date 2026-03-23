@@ -1,5 +1,5 @@
+import { Check, Pin, X } from "lucide-solid";
 import { createSignal, createMemo, Show } from "solid-js";
-import { IconCheck, IconClose, IconPin } from "./Icons";
 
 type Rect = { x: number; y: number; w: number; h: number };
 
@@ -177,7 +177,7 @@ export function SelectionArea(props: Props) {
               class="p-2 bg-neutral-100 hover:bg-white text-neutral-900 rounded-md transition-colors shadow-lg"
               title="Перевести (однократно)"
             >
-              <IconCheck size={16} />
+              <Check size={16} />
             </button>
             <button
               data-action
@@ -185,7 +185,7 @@ export function SelectionArea(props: Props) {
               class="p-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-md transition-colors shadow-lg"
               title="Постоянный перевод"
             >
-              <IconPin size={16} />
+              <Pin size={16} />
             </button>
             <button
               data-action
@@ -193,7 +193,7 @@ export function SelectionArea(props: Props) {
               class="p-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 rounded-md transition-colors shadow-lg border border-neutral-600"
               title="Отмена"
             >
-              <IconClose size={16} />
+              <X size={16} />
             </button>
           </div>
         </Show>
