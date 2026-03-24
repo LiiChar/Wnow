@@ -36,16 +36,16 @@ pub async fn translate_word_at_cursor(app: &AppHandle) {
     );
 
     // Размер области вокруг курсора для захвата (в физических пикселях)
-    let phys_radius = 200;
+    let phys_radius = (100, 50);
 
     let mut capture = Capture::new();
     let (screen_w, screen_h) = capture.get_capture_size();
 
     // Область захвата в физических пикселях
-    let capture_x = (phys_mouse_x - phys_radius).max(0);
-    let capture_y = (phys_mouse_y - phys_radius).max(0);
-    let capture_w = (phys_radius * 2).min(screen_w as i32 - capture_x);
-    let capture_h = (phys_radius * 2).min(screen_h as i32 - capture_y);
+    let capture_x = (phys_mouse_x - phys_radius.0).max(0);
+    let capture_y = (phys_mouse_y - phys_radius.1).max(0);
+    let capture_w = (phys_radius.0 * 2).min(screen_w as i32 - capture_x);
+    let capture_h = (phys_radius.1 * 2).min(screen_h as i32 - capture_y);
 
     log!(
         Level::Info,
@@ -138,17 +138,13 @@ pub async fn translate_word_at_cursor(app: &AppHandle) {
 
     if boxes.is_empty() {
         log!(Level::Info, "No text found in capture area");
-        let result = WordTranslation {
-            word: String::new(),
-            translation: "Текст не найден".to_string(),
-            context: String::new(),
-            context_translation: String::new(),
-            popup_x: logical_mouse_x,
-            popup_y: (logical_mouse_y - 60).max(10),
-            word_x: logical_mouse_x - 20,
-            word_y: logical_mouse_y - 10,
-            word_w: 40,
-            word_h: 20,
+        let result = OcrWord {
+            text: String::new(),
+            translation: Some("Текст не найден".to_string()),
+            x: logical_mouse_x - 20,
+            y: logical_mouse_y - 10,
+            w: 40,
+            h: 20,
         };
 
         if let Some(window) = app.get_webview_window("overlay") {
@@ -157,7 +153,7 @@ pub async fn translate_word_at_cursor(app: &AppHandle) {
             set_window_topmost(&window);
         }
 
-        app.emit_to("overlay", "translate_word", &result).ok();
+        app.emit_to("overlay", "show_translate", &result).ok();
         return;
     }
 
@@ -181,65 +177,30 @@ pub async fn translate_word_at_cursor(app: &AppHandle) {
             }
         };
 
-        // Контекст - все слова на той же строке
-        let context: String = boxes
-            .iter()
-            .filter(|b| {
-                let center_y = word_box.y + word_box.h / 2;
-                b.y <= center_y && b.y + b.h >= center_y
-            })
-            .map(|b| b.text.trim())
-            .collect::<Vec<_>>()
-            .join(" ");
-
-        // Переводим контекст если больше одного слова
-        let word_count = context.split_whitespace().count();
-        let context_translation = if word_count > 1 {
-            translate(context.clone(), "en", "ru")
-                .await
-                .unwrap_or_default()
-        } else {
-            String::new()
-        };
-
-        // Абсолютные координаты слова (в логических пикселях для фронтенда)
         let abs_word_x = capture_x_logical + word_box.x;
         let abs_word_y = capture_y_logical + word_box.y;
 
-        // Popup над словом
-        let popup_x = abs_word_x + word_box.w / 2;
-        let popup_y = abs_word_y - 50;
-
-        let result = WordTranslation {
-            word: word_text,
-            translation,
-            context,
-            context_translation,
-            popup_x,
-            popup_y: popup_y.max(10),
-            word_x: abs_word_x,
-            word_y: abs_word_y,
-            word_w: word_box.w,
-            word_h: word_box.h,
-        };
+        let result = vec![OcrWord {
+            text: word_text,
+            translation: Some(translation),
+            x: abs_word_x,
+            y: abs_word_y,
+            w: word_box.w,
+            h: word_box.h,
+        }];
 
         log!(
             Level::Info,
-            "Result: word at ({}, {}) {}x{}",
-            result.word_x,
-            result.word_y,
-            result.word_w,
-            result.word_h
+            "Result: word {} at ({}, {}) {}x{}",
+            result[0].text,
+            result[0].x,
+            result[0].y,
+            result[0].w,
+            result[0].h
         );
 
-        if let Some(window) = app.get_webview_window("overlay") {
-            window.set_ignore_cursor_events(false).ok();
-            window.set_focus().ok();
-            set_window_topmost(&window);
-        }
-
-        app.emit_to("overlay", "translate_word", &result)
-            .expect("Failed to emit translate_word");
+        app.emit_to("overlay", "show_translate", &result)
+            .expect("Failed to emit show_translate");
     } else {
         log!(
             Level::Info,

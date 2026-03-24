@@ -1,6 +1,8 @@
 export type TextBox = {
 	text: string;
 	translation?: string;
+	context?: string;
+	context_translation?: string;
 	h: number;
 	w: number;
 	x: number;

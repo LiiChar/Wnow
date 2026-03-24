@@ -24,3 +24,8 @@ pub async fn quick_translate(word: String) -> Result<String, String> {
 pub async fn batch_translate(words: Vec<String>) -> Vec<(String, String)> {
     crate::translation::translate_words_batch(words, "en", "ru").await
 }
+
+#[tauri::command]
+pub fn log(message: String) {
+    println!("{}", message);
+}

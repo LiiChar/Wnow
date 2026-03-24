@@ -19,6 +19,7 @@ import { TextBox } from '../../shared/types/ocr';
 import { Check, Copy, FoldVertical, Trash } from 'lucide-solid';
 import { toaster } from '@kobalte/core/toast';
 import { ToastStatus } from '@/components/toaster/ToastStatus';
+import { log } from '@/shared/lib/log';
 
 interface TranslatorOverlayProps {
 	onOpenApp: () => void;
@@ -54,15 +55,15 @@ export function TranslatorOverlay(props: TranslatorOverlayProps) {
 		add<void>('open_app', () => props.onOpenApp());
 
 		add<TextBox[]>('show_translate', ({ payload }) => {
+			log.info('[LAYOUT][EVENT][show_translate]Listened to show_translate event with payload: ' + JSON.stringify(payload));
+			setBoxes(payload);
 			setShowFullTranslation(false);
-			setBoxes(prev => [...prev, ...payload]);
 			setCursorEvents(true);
-			translateBoxes(payload);
 		});
 
 		add<void>('translate_fragment', () => {
+			log.info('[LAYOUT][EVENT][translate_fragment]Listened to translate_fragment event');
 			setCursorEvents(true);
-			console.log('translate_fragment');
 			setIsSelectFragment(true);
 		});
 
@@ -72,19 +73,6 @@ export function TranslatorOverlay(props: TranslatorOverlayProps) {
 			unsubs.forEach(fn => fn());
 		});
 	});
-
-	const translateBoxes = async (boxList: TextBox[]) => {
-		try {
-			const words = boxList.map(b => b.text).filter(Boolean);
-			if (!words.length) return;
-
-			await invoke<Record<string, string>>('translate_words', {
-				words,
-			});
-		} catch (e) {
-			console.error('translateBoxes error:', e);
-		}
-	};
 
 	const translateFullText = async (text: string) => {
 		try {

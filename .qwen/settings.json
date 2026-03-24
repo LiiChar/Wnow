@@ -3,7 +3,8 @@
     "allow": [
       "Bash(cargo check *)",
       "Bash(npx *)",
-      "Bash(yarn *)"
+      "Bash(yarn *)",
+      "Bash(npm run *)"
     ]
   },
   "$version": 3

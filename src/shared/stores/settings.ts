@@ -2,7 +2,7 @@ import { createSignal } from 'solid-js';
 import type { Store } from '@tauri-apps/plugin-store';
 import type { AppSettings } from '../types/storage';
 
-const DEFAULT_SETTINGS: AppSettings = {
+export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'dark',
   source_lang: 'en',
   target_lang: 'ru',

@@ -8,6 +8,7 @@ type LayoutStore = {
 };
 
 export const [layoutStore, setLayoutStore] = createStore<LayoutStore>({
-  headerLabel: "Словарь",
-  headerVisible: true,
+	headerLabel: 'Словарь',
+	headerVisible: true,
+	headerStyle: ''
 });

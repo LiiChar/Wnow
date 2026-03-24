@@ -20,12 +20,7 @@ export const BoxCanvas = (props: BoxCanvasProps) => {
       <For each={props.boxes()}>
         {(box, i) => (
           <BoxElement
-            text={box.text}
-            translation={box.translation}
-            x={box.x}
-            y={box.y}
-            w={box.w}
-            h={box.h}
+            box={box}
             onClick={handleWordClick}
             index={i()}
           />

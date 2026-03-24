@@ -5,6 +5,10 @@ use crate::capture::Capture;
 use crate::ocr::{recognize_with_boxes, postprocess_ocr, OcrWord};
 use crate::capture::preprocess_for_tesseract_sys;
 use crate::translation::translate;
+use futures::future::join_all;
+use std::collections::HashMap;
+use regex::Regex;
+
 
 #[tauri::command]
 pub async fn get_block_translate(
@@ -19,7 +23,6 @@ pub async fn get_block_translate(
     let phys_w = (size.0 as f32 * scale) as i32;
     let phys_h = (size.1 as f32 * scale) as i32;
 
-
     let (text, clear_boxes) = box_ocr(phys_x, phys_y, phys_w, phys_h, scale);
 
     if text.trim().is_empty() && clear_boxes.is_empty() {
@@ -28,53 +31,69 @@ pub async fn get_block_translate(
 
     let start = Instant::now();
 
-    let separator = "===";
-    
-    let mut combined = String::new();
-    combined.push_str(&text);
-    combined.push_str(separator);
+    // 🔥 1. Собираем все тексты
+    let mut requests = Vec::new();
+
+    requests.push(text.clone());
 
     for b in &clear_boxes {
-        combined.push_str(&b.text);
-        combined.push_str(separator);
+        requests.push(b.text.clone());
     }
 
-    let translated = match translate(combined, "en", "ru").await {
-        Ok(t) => t,
-        Err(e) => {
-            log!(Level::Error, "Translation error: {:?}", e);
-            return Ok((text, clear_boxes));
-        }
-    };
+    // 🔥 2. Параллельный перевод
+    let futures = requests
+        .into_iter()
+        .map(|t| translate(t, "en", "ru"));
 
-    let parts: Vec<&str> = translated.split(separator).collect();
+    let results = join_all(futures).await;
 
-    let translated_text = parts.get(0).map_or(text.as_str(), |v| v).to_string();
-
+    // 🔥 3. Разбор результатов
+    let mut translated_text = text.clone();
     let mut translated_boxes = Vec::with_capacity(clear_boxes.len());
 
-    for (i, b) in clear_boxes.iter().enumerate() {
-        let translated_word = parts
-            .get(i + 1)
-            .unwrap_or(&b.text.as_str())
-            .trim()
-            .to_string();
+    for (i, result) in results.into_iter().enumerate() {
+        match result {
+            Ok(translated) => {
+                if i == 0 {
+                    translated_text = translated;
+                } else {
+                    let b = &clear_boxes[i - 1];
 
-        translated_boxes.push(OcrWord {
-            x: b.x,
-            y: b.y,
-            w: b.w,
-            h: b.h,
-            text: b.text.clone(),
-            translation: Some(translated_word)
-        });
+                    translated_boxes.push(OcrWord {
+                        x: b.x,
+                        y: b.y,
+                        w: b.w,
+                        h: b.h,
+                        text: b.text.clone(),
+                        translation: Some(translated),
+                    });
+                }
+            }
+            Err(e) => {
+                log!(Level::Error, "Translation error: {:?}", e);
+
+                if i == 0 {
+                    translated_text = text.clone();
+                } else {
+                    let b = &clear_boxes[i - 1];
+
+                    translated_boxes.push(OcrWord {
+                        x: b.x,
+                        y: b.y,
+                        w: b.w,
+                        h: b.h,
+                        text: b.text.clone(),
+                        translation: Some(b.text.clone()),
+                    });
+                }
+            }
+        }
     }
 
     log!(
         Level::Info,
-        "Translation: {}ms, parts: {}",
-        start.elapsed().as_millis(),
-        parts.len()
+        "Translation done in {}ms",
+        start.elapsed().as_millis()
     );
 
     Ok((translated_text, translated_boxes))

@@ -123,6 +123,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_log::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
+            commands::common::log,
             commands::common::set_clickthrough,
             commands::common::get_mouse_position,
             commands::common::quick_translate,

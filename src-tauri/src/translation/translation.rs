@@ -1,14 +1,17 @@
 use std::time::{Duration, Instant};
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
+use reqwest::StatusCode;
 use thiserror::Error;
 use tauri_plugin_log::log::{log, Level};
+use tokio::time::sleep;
 
 use super::local;
 
 const CACHE_TTL: Duration = Duration::from_secs(60 * 60 * 24);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(2); 
 const MAX_BATCH_SIZE: usize = 10; 
+const MAX_RETRIES: usize = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TranslationMode {
@@ -102,7 +105,7 @@ pub async fn translate(
         return Ok(local_result);
     }
 
-    match translate_google(&text, from, to).await {
+    match online_translate(text.clone(), from, to).await {
         Ok(translation) if !translation.is_empty() => {
             cache_result(&cache_key, translation.clone());
             return Ok(translation);
@@ -216,11 +219,9 @@ fn cache_result(key: &str, value: String) {
         },
     );
 }
-
-/// Google Translate API (бесплатный endpoint)
-async fn translate_google(text: &str, from: &str, to: &str) -> Result<String, TranslateError> {
-    // Конвертируем коды языков
-    let from_code = match from {
+/// 🔥 НОРМАЛИЗАЦИЯ ЯЗЫКОВ
+fn normalize_lang(lang: &str) -> &str {
+    match lang {
         "eng" | "en" => "en",
         "rus" | "ru" => "ru",
         "jpn" | "ja" => "ja",
@@ -231,102 +232,176 @@ async fn translate_google(text: &str, from: &str, to: &str) -> Result<String, Tr
         "por" | "pt" => "pt",
         "zho" | "zh" => "zh",
         "kor" | "ko" => "ko",
-        _ => from,
-    };
+        _ => lang,
+    }
+}
 
-    let to_code = match to {
-        "eng" | "en" => "en",
-        "rus" | "ru" => "ru",
-        "jpn" | "ja" => "ja",
-        "deu" | "de" => "de",
-        "fra" | "fr" => "fr",
-        "spa" | "es" => "es",
-        "ita" | "it" => "it",
-        "por" | "pt" => "pt",
-        "zho" | "zh" => "zh",
-        "kor" | "ko" => "ko",
-        _ => to,
-    };
+pub async fn online_translate(text: String, from: &str, to: &str) -> Result<String, TranslateError> {
+    let from = normalize_lang(from);
+    let to = normalize_lang(to);
 
-    let url = format!(
-        "https://translate.googleapis.com/translate_a/single?client=gtx&sl={}&tl={}&dt=t&q={}",
-        from_code,
-        to_code,
-        urlencoding::encode(text)
-    );
+    // 🔥 retry loop
+    for attempt in 0..=MAX_RETRIES {
+        
 
-    let response = HTTP_CLIENT
-        .get(&url)
-        .header(
-            "User-Agent",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        )
+        if let Ok(res) = translate_mymemory(&text, from, to).await {
+            if !res.is_empty() {
+                return Ok(res);
+            }
+        }
+
+        if let Ok(res) = translate_deepl(&text, from, to).await {
+            if !res.is_empty() {
+                return Ok(res);
+            }
+        }
+
+        if let Ok(res) = translate_libre(&text, from, to).await {
+            if !res.is_empty() {
+                return Ok(res);
+            }
+        }
+
+        if let Ok(res) = translate_google(&text, from, to).await {
+            if !res.is_empty() {
+                return Ok(res);
+            }
+        }
+
+        if attempt < MAX_RETRIES {
+            sleep(Duration::from_millis(200)).await;
+        }
+    }
+
+    Err(TranslateError::NotFound)
+}
+
+async fn translate_mymemory(text: &str, from: &str, to: &str) -> Result<String, TranslateError> {
+    let url = "https://mymemory.translated.net/api/get";
+
+    let params = [
+        ("q", text),
+        ("langpair", &format!("{}|{}", from, to)),
+    ];
+
+    let res = HTTP_CLIENT
+        .get(url)
+        .query(&params)
         .send()
         .await
         .map_err(|e| TranslateError::Network(e.to_string()))?;
 
-    if !response.status().is_success() {
+    if !res.status().is_success() {
         return Err(TranslateError::Network(format!(
-            "HTTP {}",
-            response.status()
+            "MyMemory HTTP {}",
+            res.status()
         )));
     }
 
-    let text = response
-        .text()
+    let json: serde_json::Value = res
+        .json()
         .await
         .map_err(|e| TranslateError::Translate(e.to_string()))?;
 
-    parse_google_response(&text).ok_or(TranslateError::NotFound)
+    Ok(json["responseData"]["translatedText"]
+        .as_str()
+        .unwrap_or("")
+        .to_string())
 }
 
-/// Парсинг ответа Google Translate
-fn parse_google_response(response: &str) -> Option<String> {
-    let mut result = String::new();
-    let mut in_string = false;
-    let mut escape = false;
-    let mut current = String::new();
-    let mut strings: Vec<String> = Vec::new();
+async fn translate_deepl(text: &str, from: &str, to: &str) -> Result<String, TranslateError> {
+    let url = "https://api-free.deepl.com/v2/translate";
 
-    for ch in response.chars() {
-        if escape {
-            current.push(ch);
-            escape = false;
-            continue;
-        }
+    let params = [
+        ("text", text),
+        ("source_lang", &from.to_uppercase()),
+        ("target_lang", &to.to_uppercase()),
+    ];
 
-        match ch {
-            '\\' if in_string => escape = true,
-            '"' => {
-                if in_string {
-                    strings.push(current.clone());
-                    current.clear();
-                }
-                in_string = !in_string;
-            }
-            _ if in_string => current.push(ch),
-            _ => {}
-        }
+    let res = HTTP_CLIENT
+        .post(url)
+        .header("Authorization", format!("DeepL-Auth-Key {}", ""))
+        .form(&params)
+        .send()
+        .await
+        .map_err(|e| TranslateError::Network(e.to_string()))?;
+
+    if res.status() != StatusCode::OK {
+        return Err(TranslateError::Network(format!(
+            "DeepL HTTP {}",
+            res.status()
+        )));
     }
 
-    // Берём переводы (чётные элементы)
-    let mut i = 0;
-    while i < strings.len() {
-        if i % 2 == 0 && !strings[i].is_empty() {
-            if !result.is_empty() {
-                result.push(' ');
-            }
-            result.push_str(&strings[i]);
-        }
-        i += 1;
-        if i >= 2 && !result.is_empty() {
-            break;
-        }
+    let json: serde_json::Value = res
+        .json()
+        .await
+        .map_err(|e| TranslateError::Translate(e.to_string()))?;
+
+    Ok(json["translations"][0]["text"]
+        .as_str()
+        .unwrap_or("")
+        .to_string())
+}
+
+async fn translate_libre(text: &str, from: &str, to: &str) -> Result<String, TranslateError> {
+    let res = HTTP_CLIENT
+        .post("https://libretranslate.de/translate")
+        .json(&serde_json::json!({
+            "q": text,
+            "source": from,
+            "target": to,
+            "format": "text"
+        }))
+        .send()
+        .await
+        .map_err(|e| TranslateError::Network(e.to_string()))?;
+
+    if !res.status().is_success() {
+        return Err(TranslateError::Network(format!(
+            "Libre HTTP {}",
+            res.status()
+        )));
     }
 
-    if result.is_empty() {
-        None
-    } else {
-        Some(result)
+    let json: serde_json::Value = res
+        .json()
+        .await
+        .map_err(|e| TranslateError::Translate(e.to_string()))?;
+
+    Ok(json["translatedText"]
+        .as_str()
+        .unwrap_or("")
+        .to_string())
+}
+
+async fn translate_google(text: &str, from: &str, to: &str) -> Result<String, TranslateError> {
+    let url = format!(
+        "https://translate.googleapis.com/translate_a/single?client=gtx&sl={}&tl={}&dt=t&q={}",
+        from,
+        to,
+        urlencoding::encode(text)
+    );
+
+    let res = HTTP_CLIENT
+        .get(&url)
+        .header("User-Agent", "Mozilla/5.0")
+        .send()
+        .await
+        .map_err(|e| TranslateError::Network(e.to_string()))?;
+
+    if !res.status().is_success() {
+        return Err(TranslateError::Network(format!(
+            "Google HTTP {}",
+            res.status()
+        )));
     }
+
+    let json: serde_json::Value = res
+        .json()
+        .await
+        .map_err(|e| TranslateError::Translate(e.to_string()))?;
+
+    // 🔥 нормальный парс без костылей
+    Ok(json[0][0][0].as_str().unwrap_or("").to_string())
 }

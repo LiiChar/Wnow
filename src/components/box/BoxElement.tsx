@@ -1,12 +1,8 @@
+import { TextBox } from "@/shared/types/ocr";
 import { createSignal, Show } from "solid-js";
 
 type BoxElementProps = {
-	text: string;
-  translation?: string;
-	x: number;
-	y: number;
-	w: number;
-	h: number;
+	box: TextBox
   onHover?: (text: string, x: number, y: number, w: number, h: number) => void;
   onClick?: (text: string, x: number, y: number, w: number, h: number) => void;
   index: number;
@@ -20,23 +16,22 @@ export const BoxElement = (props: BoxElementProps) => {
 		<div
       class="fixed cursor-pointer z-[10000]"
       style={{
-        left: `${props.x - padding}px`,
-        top: `${props.y - padding}px`,
-        width: `${props.w + padding * 2}px`,
-        height: `${props.h + padding * 2}px`,
+        left: `${props.box.x - padding}px`,
+        top: `${props.box.y - padding}px`,
+        width: `${props.box.w + padding * 2}px`,
+        height: `${props.box.h + padding * 2}px`,
         "animation-delay": `${props.index * 20}ms`,
       }}
       onClick={(e) => {
         e.stopPropagation();
-        props.onClick?.(props.text, props.x, props.y, props.w, props.h);
+        props.onClick?.(props.box.text, props.box.x, props.box.y, props.box.w, props.box.h);
       }}
       onMouseEnter={() => {
         setIsHovered(true);
-        props.onHover?.(props.text, props.x, props.y, props.w, props.h);
+        props.onHover?.(props.box.text, props.box.x, props.box.y, props.box.w, props.box.h);
       }}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Background */}
       <div
         class="absolute inset-0 rounded transition-all duration-150"
 			style={{
@@ -49,12 +44,12 @@ export const BoxElement = (props: BoxElementProps) => {
       <Show when={isHovered()}>
         <div
           class="absolute z-50 left-1/2 -translate-x-1/2 pointer-events-none animate-fade-in"
-          style={{ bottom: `${props.h + padding * 2 + 8}px` }}
+          style={{ bottom: `${props.box.h + padding * 2 + 8}px` }}
         >
           <div class="bg-neutral-900 border border-neutral-700 rounded px-3 py-2 shadow-lg whitespace-nowrap">
-            <div class="text-xs text-neutral-500">{props.text}</div>
+            <div class="text-xs text-neutral-500">{props.box.text}</div>
             <div class="text-sm text-neutral-200">
-              {props.translation || "No translation"}
+              {props.box.translation || "No translation"}
             </div>
           </div>
           {/* Arrow */}

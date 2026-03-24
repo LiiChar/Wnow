@@ -166,3 +166,76 @@ export const ToastProgress: VoidComponent = () => {
 		</ToastPrimitive.ProgressTrack>
 	);
 };
+
+// Toast state management
+import { createSignal, For } from 'solid-js';
+
+export interface ToastData {
+	id?: string | number;
+	title: string;
+	description?: string;
+	type?: 'default' | 'success' | 'error' | 'warning' | 'info';
+	duration?: number;
+}
+
+const [getToasts, setToasts] = createSignal<ToastData[]>([]);
+
+export function useToast() {
+	const createToast = (toast: ToastData) => {
+		const id = toast.id || Math.random().toString(36).substr(2, 9);
+		const newToast: ToastData = { ...toast, id };
+		
+		setToasts(prev => [...prev, newToast]);
+		
+		const duration = toast.duration ?? 3000;
+		if (duration > 0) {
+			setTimeout(() => {
+				dismissToast(id);
+			}, duration);
+		}
+		
+		return id;
+	};
+
+	const dismissToast = (id?: string | number) => {
+		if (id) {
+			setToasts(prev => prev.filter(t => t.id !== id));
+		}
+	};
+
+	return { toasts: getToasts(), createToast, dismissToast };
+}
+
+// Simple createToast function for imperative usage
+let toastCallback: ((toast: ToastData) => void) | null = null;
+
+export function setToastCallback(callback: (toast: ToastData) => void) {
+	toastCallback = callback;
+}
+
+export function createToast(toast: ToastData) {
+	if (toastCallback) {
+		toastCallback(toast);
+	}
+}
+
+// Enhanced ToastList with For loop - uses ol directly instead of Kobalte ToastList
+export function ToastListWithToasts() {
+	return (
+		<ol class='fixed bottom-0 right-0 z-[10005] flex max-h-screen w-full flex-col-reverse gap-2 p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]'>
+			<For each={getToasts()}>
+				{(toast) => (
+					<Toast toastId={toast.id as number} variant={toast.type === 'error' ? 'destructive' : 'default'}>
+						<ToastContent>
+							<ToastTitle>{toast.title}</ToastTitle>
+							{toast.description && (
+								<ToastDescription>{toast.description}</ToastDescription>
+							)}
+						</ToastContent>
+						<ToastProgress />
+					</Toast>
+				)}
+			</For>
+		</ol>
+	);
+}
