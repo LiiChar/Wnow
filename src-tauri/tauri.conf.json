@@ -15,14 +15,18 @@
         "label": "overlay",
         "title": "Wnow Translator",
         "url": "/",
-        "width": 800,
-        "height": 600,
+        "width": 1280,
+        "height": 720,
         "transparent": true,
         "decorations": false,
         "maximized": true,
         "alwaysOnTop": true,
         "skipTaskbar": true,
-        "visible": true
+        "visible": true,
+        "focus": false,
+        "acceptFirstMouse": true,
+        "shadow": false,
+        "resizable": false
       },
       {
         "label": "main",

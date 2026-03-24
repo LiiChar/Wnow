@@ -9,7 +9,7 @@ import { Router } from "./app/router/Router";
 function App() {
   const window_ = getCurrentWebviewWindow();
   const initialMode = window_.label === 'main' ? 'app' : 'overlay';
-  
+
   const [mode] = createSignal<'overlay' | 'app'>(initialMode);
 
   if (initialMode === 'app') {
@@ -19,9 +19,15 @@ function App() {
     document.body.style.background = 'transparent';
   }
 
+  console.log('[App] Window label:', window_.label, 'Mode:', mode());
+
   onMount(() => {
     initSettings().then(settings => {
       applyTheme(settings.theme);
+      // Сохраняем прозрачный фон для overlay после применения темы
+      if (initialMode === 'overlay') {
+        document.body.style.background = 'transparent';
+      }
     }).catch(console.error);
   });
 
@@ -41,7 +47,7 @@ function App() {
 
   return (
 		<Show
-			when={mode() === 'overlay'}
+			when={mode() === 'app'}
 			fallback={<TranslatorOverlay onOpenApp={handleOpenApp} />}
 		>
 			<Router />

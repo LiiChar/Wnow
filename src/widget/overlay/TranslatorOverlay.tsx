@@ -1,6 +1,5 @@
 import {
 	createSignal,
-	createMemo,
 	Show,
 	For,
 	onMount,
@@ -28,9 +27,6 @@ interface TranslatorOverlayProps {
 export function TranslatorOverlay(props: TranslatorOverlayProps) {
 	const [isSelectFragment, setIsSelectFragment] = createSignal(false);
 	const [boxes, setBoxes] = createSignal<TextBox[]>([]);
-	const [translations, setTranslations] = createSignal<Record<string, string>>(
-		{},
-	);
 	const [fullText, setFullText] = createSignal('');
 	const [showFullTranslation, setShowFullTranslation] = createSignal(false);
 	const [fullCopied, setFullCopied] = createSignal(false);
@@ -42,10 +38,6 @@ export function TranslatorOverlay(props: TranslatorOverlayProps) {
 
 	const setCursorEvents = (enabled: boolean) => {
 		getCurrentWebviewWindow().setIgnoreCursorEvents(!enabled);
-	};
-
-	const addTranslation = (text: string, translation: string) => {
-		setTranslations(prev => ({ ...prev, [text.toLowerCase()]: translation }));
 	};
 
 		onMount(() => {
@@ -86,11 +78,9 @@ export function TranslatorOverlay(props: TranslatorOverlayProps) {
 			const words = boxList.map(b => b.text).filter(Boolean);
 			if (!words.length) return;
 
-			const result = await invoke<Record<string, string>>('translate_words', {
+			await invoke<Record<string, string>>('translate_words', {
 				words,
 			});
-
-			Object.entries(result).forEach(([w, t]) => addTranslation(w, t));
 		} catch (e) {
 			console.error('translateBoxes error:', e);
 		}
@@ -146,7 +136,7 @@ export function TranslatorOverlay(props: TranslatorOverlayProps) {
 
 
 	return (
-		<main class='fixed inset-0 bg-transparent' onClick={closeAll}>
+		<main class='fixed inset-0 bg-transparent z-[9998]' onClick={closeAll}>
 			<BoxCanvas boxes={boxes} />
 
 			<For each={floatingTranslations()}>
@@ -160,7 +150,7 @@ export function TranslatorOverlay(props: TranslatorOverlayProps) {
 
 			<Show when={showFullTranslation() && fullText()}>
 				<div
-					class={`fixed z-50 ${
+					class={`fixed z-[10002] ${
 						isCompactMode()
 							? 'bottom-4 right-4 max-w-xs'
 							: 'bottom-4 left-1/2 -translate-x-1/2 max-w-xl w-[90%]'

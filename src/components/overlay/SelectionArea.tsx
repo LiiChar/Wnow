@@ -123,8 +123,8 @@ export function SelectionArea(props: Props) {
   return (
     <div
       onMouseDown={onMouseDown}
-      class="fixed inset-0 z-50"
-      style={{ 
+      class="fixed inset-0 z-[10003]"
+      style={{
         cursor: isSelecting() ? 'crosshair' : 'default',
         background: 'rgba(0, 0, 0, 0.5)',
       }}
@@ -168,7 +168,7 @@ export function SelectionArea(props: Props) {
         {/* Buttons - компактные иконки */}
         <Show when={!isSelecting() && rect()!.w > 50 && rect()!.h > 30}>
           <div
-            class="fixed flex gap-1.5 pointer-events-auto animate-fade-in z-100"
+            class="fixed flex gap-1.5 pointer-events-auto animate-fade-in z-[10004]"
             style={buttonsPosition().style}
           >
             <button

@@ -74,7 +74,7 @@ export function FloatingTranslation(props: Props) {
     <Show when={props.data}>
       {(data) => (
         <div
-          class="fixed z-200 pointer-events-auto select-none animate-fade-in"
+          class="fixed z-[10001] pointer-events-auto select-none animate-fade-in"
           style={{
             left: `${position().x}px`,
             top: `${position().y}px`,

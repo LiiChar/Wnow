@@ -7,47 +7,33 @@ interface BoxCanvasProps {
   boxes: Accessor<TextBox[]>;
 }
 
-
-
 export const BoxCanvas = (props: BoxCanvasProps) => {
-	const [wordPopup, setWordPopup] = createSignal<any>(null);
+  const [wordPopup, setWordPopup] = createSignal<TextBox | null>(null);
 
-	const handleWordClick = async (box: TextBox) => {
-		setWordPopup({
-			word: box.text,
-			translation: box.translation,
-			context: '',
-			context_translation: '',
-			popup_x: box.x + box.w / 2,
-			popup_y: box.y,
-			word_x: box.x,
-			word_y: box.y,
-			word_w: box.w,
-			word_h: box.h,
-		});
-	};
+  const handleWordClick = (_text: string, x: number, y: number, w: number, h: number) => {
+    const box = props.boxes().find(b => b.x === x && b.y === y && b.w === w && b.h === h);
+    if (box) setWordPopup(box);
+  };
 
-	return (
-		<div class='fixed inset-0 z-40 pointer-events-auto'>
-			<For each={props.boxes()}>
-				{(box, i) => (
-					<>
-						<BoxElement
-							text={box.text}
-							translation={box.translation}
-							x={box.x}
-							y={box.y}
-							w={box.w}
-							h={box.h}
-							onClick={() => handleWordClick(box)}
-							index={i()}
-						/>
-					</>
-				)}
-			</For>
-			<Show when={wordPopup}>
-				<WordPopup box={wordPopup} />
-			</Show>
-		</div>
-	);
+  return (
+    <div class='fixed inset-0 z-[9999] pointer-events-auto'>
+      <For each={props.boxes()}>
+        {(box, i) => (
+          <BoxElement
+            text={box.text}
+            translation={box.translation}
+            x={box.x}
+            y={box.y}
+            w={box.w}
+            h={box.h}
+            onClick={handleWordClick}
+            index={i()}
+          />
+        )}
+      </For>
+      <Show when={wordPopup()}>
+        <WordPopup box={() => wordPopup()!} />
+      </Show>
+    </div>
+  );
 };

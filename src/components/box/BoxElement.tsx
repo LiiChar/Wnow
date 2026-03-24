@@ -18,7 +18,7 @@ export const BoxElement = (props: BoxElementProps) => {
 
 	return (
 		<div
-      class="fixed cursor-pointer z-40"
+      class="fixed cursor-pointer z-[10000]"
       style={{
         left: `${props.x - padding}px`,
         top: `${props.y - padding}px`,

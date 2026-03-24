@@ -143,7 +143,7 @@ export function WordPopup(props: WordPopupProps) {
 		<>
 			<Show when={!isClipboard()}>
 				<div
-					class='fixed pointer-events-none z-40 rounded border-2 border-neutral-400 bg-neutral-400/10'
+					class='fixed pointer-events-none z-[10000] rounded border-2 border-neutral-400 bg-neutral-400/10'
 					style={{
 						left: `${data().x - padding}px`,
 						top: `${data().y - padding}px`,
@@ -154,7 +154,7 @@ export function WordPopup(props: WordPopupProps) {
 
 				<Show when={line()}>
 					{l => (
-						<svg class='fixed inset-0 z-40 pointer-events-none'>
+						<svg class='fixed inset-0 z-[10000] pointer-events-none'>
 							<line
 								x1={l().x1}
 								y1={l().y1}
@@ -170,7 +170,7 @@ export function WordPopup(props: WordPopupProps) {
 			</Show>
 
 			<div
-				class='fixed z-50'
+				class='fixed z-[10002]'
 				style={{
 					left: `${position().left}px`,
 					top: `${position().top}px`,
