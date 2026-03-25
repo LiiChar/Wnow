@@ -9,7 +9,7 @@ use tauri_plugin_log::log::{log, Level};
 use super::local;
 
 const CACHE_TTL: Duration = Duration::from_secs(60 * 60 * 24);
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(2); 
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(10); 
 const MAX_BATCH_SIZE: usize = 10; 
 const MAX_RETRIES: usize = 1;
 
@@ -22,11 +22,12 @@ pub enum TranslationMode {
 
 /// Текущий режим перевода
 static TRANSLATION_MODE: Lazy<std::sync::Mutex<TranslationMode>> = 
-    Lazy::new(|| std::sync::Mutex::new(TranslationMode::OfflineOnly));
+    Lazy::new(|| std::sync::Mutex::new(TranslationMode::OnlineFirst));
 
 
 static HTTP_CLIENT: Lazy<reqwest::Client> = Lazy::new(|| {
     reqwest::Client::builder()
+        .no_proxy()
         .timeout(REQUEST_TIMEOUT)
         .pool_max_idle_per_host(5)
         .tcp_keepalive(Duration::from_secs(30))
@@ -248,11 +249,11 @@ pub async fn online_translate(text: String, from: &str, to: &str) -> Result<Stri
             }
         }
 
-        if let Ok(res) = translate_mymemory(&text, from, to).await {
-            if !res.is_empty() {
-                return Ok(res);
-            }
-        }
+        // if let Ok(res) = translate_mymemory(&text, from, to).await {
+        //     if !res.is_empty() {
+        //         return Ok(res);
+        //     }
+        // }
 
         // if let Ok(res) = translate_deepl(&text, from, to).await {
         //     if !res.is_empty() {
@@ -374,9 +375,13 @@ async fn translate_libre(text: &str, from: &str, to: &str) -> Result<String, Tra
         .to_string())
 }
 
-async fn translate_google(text: &str, from: &str, to: &str) -> Result<String, TranslateError> {
+async fn translate_google(
+    text: &str,
+    from: &str,
+    to: &str,
+) -> Result<String, TranslateError> {
     let url = format!(
-        "https://translate.googleapis.com/translate_a/single?client=gtx&sl={}&tl={}&dt=t&dt=bd&dj=1&q={}",
+        "https://translate.googleapis.com/translate_a/single?client=gtx&sl={}&tl={}&dt=t&dj=1&q={}",
         from,
         to,
         urlencoding::encode(text)
@@ -387,7 +392,7 @@ async fn translate_google(text: &str, from: &str, to: &str) -> Result<String, Tr
         .header("User-Agent", "Mozilla/5.0")
         .send()
         .await
-        .map_err(|e| TranslateError::Network(e.to_string()))?;
+        .map_err(|e| TranslateError::Network(format!("Google send error: {}", e)))?;
 
     if !res.status().is_success() {
         return Err(TranslateError::Network(format!(
@@ -399,8 +404,10 @@ async fn translate_google(text: &str, from: &str, to: &str) -> Result<String, Tr
     let json: serde_json::Value = res
         .json()
         .await
-        .map_err(|e| TranslateError::Translate(e.to_string()))?;
+        .map_err(|e| TranslateError::Translate(format!("JSON error: {}", e)))?;
 
-    // 🔥 нормальный парс без костылей
-    Ok(json[0][0][0].as_str().unwrap_or("").to_string())
+    Ok(json["sentences"][0]["trans"]
+        .as_str()
+        .unwrap_or("")
+        .to_string())
 }
