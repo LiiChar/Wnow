@@ -55,6 +55,14 @@ impl Database {
         )
         .map_err(|e| e.to_string())?;
 
+        conn.execute_batch(
+            r#"
+            ALTER TABLE words ADD COLUMN ease_factor REAL DEFAULT 2.5;
+            ALTER TABLE words ADD COLUMN interval INTEGER DEFAULT 0;
+            ALTER TABLE words ADD COLUMN repetitions INTEGER DEFAULT 0;
+        "#,
+        ).ok();
+
         // Инициализируем статистику если нет
         conn.execute(
             "INSERT OR IGNORE INTO stats (id, total_reviews, correct_reviews, streak_days) VALUES (1, 0, 0, 0)",
@@ -84,8 +92,22 @@ impl Database {
             .as_secs() as i64;
 
         conn.execute(
-            "INSERT INTO words (word, translation, context, context_translation, screenshot_path, source_lang, target_lang, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            params![word, translation, context, context_translation, screenshot_path, source_lang, target_lang, now],
+            "INSERT INTO words (
+                word, translation, context, context_translation, screenshot_path, 
+                source_lang, target_lang, created_at,
+                ease_factor, interval, repetitions, next_review
+            ) 
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 2.5, 0, 0, ?8)",
+            params![
+                word,
+                translation,
+                context,
+                context_translation,
+                screenshot_path,
+                source_lang,
+                target_lang,
+                now
+            ],
         ).map_err(|e| e.to_string())?;
 
         Ok(conn.last_insert_rowid())
@@ -97,7 +119,7 @@ impl Database {
         let conn = guard.as_ref().ok_or("Database not initialized")?;
 
         let mut stmt = conn.prepare(
-            "SELECT id, word, translation, context, context_translation, screenshot_path, source_lang, target_lang, created_at, last_reviewed, review_count, correct_count, mastery_level, next_review FROM words ORDER BY created_at DESC"
+            "SELECT id, word, translation, context, context_translation, screenshot_path, source_lang, target_lang, created_at, last_reviewed, review_count, correct_count, mastery_level, next_review, ease_factor, interval, repetitions FROM words ORDER BY created_at DESC"
         ).map_err(|e| e.to_string())?;
 
         let words = stmt
@@ -117,6 +139,9 @@ impl Database {
                     correct_count: row.get(11)?,
                     mastery_level: row.get(12)?,
                     next_review: row.get(13)?,
+                    ease_factor: row.get(14)?,
+                    interval: row.get(15)?,
+                    repetitions: row.get(16)?,
                 })
             })
             .map_err(|e| e.to_string())?;
@@ -136,35 +161,86 @@ impl Database {
             .unwrap()
             .as_secs() as i64;
 
-        let mut stmt = conn
-            .prepare(
-                "SELECT id, word, translation, context, screenshot_path, mastery_level FROM words 
-             WHERE mastery_level < 5 AND (next_review IS NULL OR next_review <= ?1)
-             ORDER BY mastery_level ASC, next_review ASC NULLS FIRST
-             LIMIT ?2",
-            )
-            .map_err(|e| e.to_string())?;
+        let review_limit = (limit as f32 * 0.7) as i32;
 
-        let words = stmt
-            .query_map(params![now, limit], |row| {
+        // 🔥 REVIEW
+        let mut review_stmt = conn.prepare(
+            "SELECT id, word, translation, context, screenshot_path 
+            FROM words 
+            WHERE next_review <= ?1
+            ORDER BY next_review ASC
+            LIMIT ?2"
+        ).map_err(|e| e.to_string())?;
+
+        let review_words: Vec<FlashcardWord> = review_stmt
+            .query_map(params![now, review_limit], |row| {
                 Ok(FlashcardWord {
                     id: row.get(0)?,
                     word: row.get(1)?,
                     translation: row.get(2)?,
                     context: row.get(3)?,
                     screenshot_path: row.get(4)?,
-                    mastery_level: row.get(5)?,
+                    mastery_level: 0, // больше не используем
                 })
-            })
-            .map_err(|e| e.to_string())?;
+            }).map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
 
-        words
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| e.to_string())
+        // 🔥 NEW
+        let remaining = limit - review_words.len() as i32;
+
+        let mut new_words = vec![];
+
+        if remaining > 0 {
+            let mut new_stmt = conn.prepare(
+                "SELECT id, word, translation, context, screenshot_path 
+                FROM words 
+                WHERE repetitions = 0
+                ORDER BY created_at DESC
+                LIMIT ?1"
+            ).map_err(|e| e.to_string())?;
+
+            new_words = new_stmt
+                .query_map(params![remaining], |row| {
+                    Ok(FlashcardWord {
+                        id: row.get(0)?,
+                        word: row.get(1)?,
+                        translation: row.get(2)?,
+                        context: row.get(3)?,
+                        screenshot_path: row.get(4)?,
+                        mastery_level: 0,
+                    })
+                }).map_err(|e| e.to_string())?
+                .collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
+        }
+
+        // 🔀 MIX
+        let mut result = vec![];
+        let mut r = review_words;
+        let mut n = new_words;
+
+        while !r.is_empty() || !n.is_empty() {
+            let take_review = if !r.is_empty() {
+                if n.is_empty() {
+                    true
+                } else {
+                    rand::random::<f32>() < 0.7
+                }
+            } else {
+                false
+            };
+
+            if take_review {
+                result.push(r.remove(0));
+            } else if !n.is_empty() {
+                result.push(n.remove(0));
+            }
+        }
+
+        Ok(result)
     }
 
     /// Обновить прогресс слова после review
-    pub fn update_word_progress(word_id: i64, correct: bool) -> Result<(), String> {
+    pub fn update_word_progress(word_id: i64, quality: i32) -> Result<(), String> {
         let guard = DB.lock().unwrap();
         let conn = guard.as_ref().ok_or("Database not initialized")?;
 
@@ -173,34 +249,60 @@ impl Database {
             .unwrap()
             .as_secs() as i64;
 
-        // Получаем текущий уровень
-        let (mastery_level, correct_count): (i32, i32) = conn
+        let (ease_factor, interval, repetitions): (f32, i32, i32) = conn
             .query_row(
-                "SELECT mastery_level, correct_count FROM words WHERE id = ?1",
+                "SELECT ease_factor, interval, repetitions FROM words WHERE id = ?1",
                 params![word_id],
-                |row| Ok((row.get(0)?, row.get(1)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
             .map_err(|e| e.to_string())?;
 
-        let new_mastery = if correct {
-            (mastery_level + 1).min(5)
+        let mut ef = ease_factor;
+        let mut rep = repetitions;
+        let mut int = interval;
+
+        if quality < 3 {
+            rep = 0;
+            int = 1;
         } else {
-            (mastery_level - 1).max(0)
-        };
+            rep += 1;
 
-        // Интервал повторения: 1 день, 3 дня, 7 дней, 14 дней, 30 дней
-        let intervals = [86400, 259200, 604800, 1209600, 2592000];
-        let next_review = now + intervals[new_mastery.min(4) as usize];
+            if rep == 1 {
+                int = 1;
+            } else if rep == 2 {
+                int = 6;
+            } else {
+                int = (int as f32 * ef) as i32;
+            }
+        }
+
+        // 🔥 обновление ease factor
+        ef = ef + (0.1 - (5 - quality) as f32 * (0.08 + (5 - quality) as f32 * 0.02));
+        if ef < 1.3 {
+            ef = 1.3;
+        }
+
+        let next_review = now + int as i64 * 86400;
 
         conn.execute(
-            "UPDATE words SET mastery_level = ?1, last_reviewed = ?2, review_count = review_count + 1, correct_count = correct_count + ?3, next_review = ?4 WHERE id = ?5",
-            params![new_mastery, now, if correct { 1 } else { 0 }, next_review, word_id],
-        ).map_err(|e| e.to_string())?;
-
-        // Обновляем статистику
-        conn.execute(
-            "UPDATE stats SET total_reviews = total_reviews + 1, correct_reviews = correct_reviews + ?1 WHERE id = 1",
-            params![if correct { 1 } else { 0 }],
+            "UPDATE words 
+            SET ease_factor = ?1,
+                interval = ?2,
+                repetitions = ?3,
+                last_reviewed = ?4,
+                review_count = review_count + 1,
+                correct_count = correct_count + ?5,
+                next_review = ?6
+            WHERE id = ?7",
+            params![
+                ef,
+                int,
+                rep,
+                now,
+                if quality >= 3 { 1 } else { 0 },
+                next_review,
+                word_id
+            ],
         ).map_err(|e| e.to_string())?;
 
         Ok(())

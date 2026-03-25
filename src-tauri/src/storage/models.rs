@@ -17,6 +17,9 @@ pub struct SavedWord {
     pub correct_count: i32,
     pub mastery_level: i32, // 0-5, 5 = полностью выучено
     pub next_review: Option<i64>,
+    pub ease_factor: f32,
+    pub interval: i32,
+    pub repetitions: i32,
 }
 
 /// Статистика изучения

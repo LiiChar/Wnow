@@ -141,12 +141,9 @@ html, body, #root {
   transform: translateZ(0);
 }
 
-main {
-  padding: 8px 4px;
-}
-
-main:not(.overflow-y-auto) {
-  overflow: hidden;
+#app {
+  width: 100%;
+  height: 100%;
 }
 
 body .interface {
@@ -163,24 +160,23 @@ svg > path {
   color: var(--foreground) !important;
 }
 
-::-webkit-scrollbar {
+*::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-::-webkit-scrollbar-track {
+*::-webkit-scrollbar-track {
   background: transparent;
 }
 
-::-webkit-scrollbar-thumb {
+*::-webkit-scrollbar-thumb {
   background: hsl(var(--muted-foreground) / 0.3);
   border-radius: 4px;
 }
 
-::-webkit-scrollbar-thumb:hover {
+*::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.5);
 }
-
 
 .translator-mode {
   background: transparent !important;

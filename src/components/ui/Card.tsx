@@ -22,7 +22,7 @@ function CardHeader(props: ComponentProps<'div'>) {
 		<div
 			data-slot='card-header'
 			class={cn(
-				'gap-1 rounded-t-xl px-4 py-2 group-data-[size=sm]/card:px-3 group-data-[size=sm]/card:py-1.5 [.border-b]:pb-4 group-data-[size=sm]/card:[.border-b]:pb-3 flex flex-col',
+				'gap-1 rounded-t-xl px-4 py-0 group-data-[size=sm]/card:px-3 group-data-[size=sm]/card:py-1.5 [.border-b]:pb-4 group-data-[size=sm]/card:[.border-b]:pb-3 flex flex-col',
 				local.class,
 			)}
 			{...rest}

@@ -20,20 +20,19 @@ const sendLog = async (log: string) => {
 const logger = pino({
 	transport: { target: 'pino-pretty', options: { colorize: true } },
 });
-
 // 🔌 прокси-обёртка
 const wrap =
 	(level: 'info' | 'error' | 'warn' | 'debug') =>
-	(message: string, extra?: any) => {
-		logger[level](message, extra);
+	(...messages: any[]) => {
+		logger[level](messages.join(" "));
 
 		queue.push({
 			level,
-			message,
+			message: messages.join(" "),
 			time: Date.now(),
 		});
 
-		sendLog(`[${level.toUpperCase()}]${message}`);
+		sendLog(`[${level.toUpperCase()}]${messages.join(" ")}`);
 	};
 
 // 🚀 экспорт удобного API

@@ -59,8 +59,8 @@ pub async fn get_words_for_study(limit: i32) -> Result<Vec<FlashcardWord>, Strin
 
 /// Обновить прогресс слова
 #[tauri::command]
-pub async fn update_word_progress(word_id: i64, correct: bool) -> Result<(), String> {
-    Database::update_word_progress(word_id, correct)
+pub async fn update_word_progress(word_id: i64, quality: i32) -> Result<(), String> {
+    Database::update_word_progress(word_id, quality)
 }
 
 /// Удалить слово

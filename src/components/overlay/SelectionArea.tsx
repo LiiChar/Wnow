@@ -1,5 +1,6 @@
 import { Check, Pin, X } from "lucide-solid";
 import { createSignal, createMemo, Show } from "solid-js";
+import { Button } from "../ui/Button";
 
 type Rect = { x: number; y: number; w: number; h: number };
 
@@ -121,90 +122,98 @@ export function SelectionArea(props: Props) {
   };
 
   return (
-    <div
-      onMouseDown={onMouseDown}
-      class="fixed inset-0 z-[10003]"
-      style={{
-        cursor: isSelecting() ? 'crosshair' : 'default',
-        background: 'rgba(0, 0, 0, 0.5)',
-      }}
-    >
-      {/* Selection rectangle */}
-      <Show when={rect() && rect()!.w > 0}>
-        {/* Cutout mask */}
-        <svg class="fixed inset-0 w-full h-full pointer-events-none">
-          <defs>
-            <mask id="cutout">
-              <rect x="0" y="0" width="100%" height="100%" fill="white" />
-              <rect
-                x={rect()!.x}
-                y={rect()!.y}
-                width={rect()!.w}
-                height={rect()!.h}
-                fill="black"
-              />
-            </mask>
-          </defs>
-          <rect x="0" y="0" width="100%" height="100%" fill="rgba(0,0,0,0.4)" mask="url(#cutout)" />
-        </svg>
+		<div
+			onMouseDown={onMouseDown}
+			class='fixed inset-0 z-10003'
+			style={{
+				cursor: isSelecting() ? 'crosshair' : 'default',
+				background: 'rgba(0, 0, 0, 0.5)',
+			}}
+		>
+			{/* Selection rectangle */}
+			<Show when={rect() && rect()!.w > 0}>
+				{/* Cutout mask */}
+				<svg class='fixed inset-0 w-full h-full pointer-events-none'>
+					<defs>
+						<mask id='cutout'>
+							<rect x='0' y='0' width='100%' height='100%' fill='white' />
+							<rect
+								x={rect()!.x}
+								y={rect()!.y}
+								width={rect()!.w}
+								height={rect()!.h}
+								fill='black'
+							/>
+						</mask>
+					</defs>
+					<rect
+						x='0'
+						y='0'
+						width='100%'
+						height='100%'
+						fill='rgba(0,0,0,0.4)'
+						mask='url(#cutout)'
+					/>
+				</svg>
 
-        {/* Border */}
-        <div
-          class="absolute border-2 border-neutral-400 rounded"
-          style={{
-            left: `${rect()!.x}px`,
-            top: `${rect()!.y}px`,
-            width: `${rect()!.w}px`,
-            height: `${rect()!.h}px`,
-          }}
-        >
-          {/* Size indicator */}
-          <div class="absolute -top-7 left-1/2 -translate-x-1/2 px-2 py-1 bg-neutral-900 border border-neutral-700 rounded text-xs text-neutral-300 font-mono">
-            {rect()!.w} × {rect()!.h}
-          </div>
+				{/* Border */}
+				<div
+					class='absolute border-2 border-border rounded select-none'
+					style={{
+						left: `${rect()!.x}px`,
+						top: `${rect()!.y}px`,
+						width: `${rect()!.w}px`,
+						height: `${rect()!.h}px`,
+					}}
+				>
+					{/* Size indicator */}
+					<div class='absolute -top-7 left-1/2 -translate-x-1/2 px-2 py-1 bg-muted text-muted-foreground whitespace-nowrap rounded text-xs font-mono'>
+						{rect()!.w} × {rect()!.h}
+					</div>
+				</div>
 
-        </div>
+				{/* Buttons - компактные иконки */}
+				<Show when={!isSelecting() && rect()!.w > 50 && rect()!.h > 30}>
+					<div
+						class='fixed flex gap-1.5 pointer-events-auto animate-fade-in z-10004'
+						style={buttonsPosition().style}
+					>
+						<Button
+							data-action
+							onClick={() => handleConfirm('translate')}
+							title='Перевести (однократно)'
+							class='aspect-square'
+						>
+							<Check size={16} />
+						</Button>
+						<Button
+							variant={'outline'}
+							data-action
+							onClick={() => handleConfirm('persistent')}
+							title='Постоянный перевод'
+							class='aspect-square'
+						>
+							<Pin size={16} />
+						</Button>
+						<Button
+							variant={'destructive'}
+							data-action
+							onClick={handleCancel}
+							title='Отмена'
+							class='aspect-square'
+						>
+							<X size={16} />
+						</Button>
+					</div>
+				</Show>
+			</Show>
 
-        {/* Buttons - компактные иконки */}
-        <Show when={!isSelecting() && rect()!.w > 50 && rect()!.h > 30}>
-          <div
-            class="fixed flex gap-1.5 pointer-events-auto animate-fade-in z-[10004]"
-            style={buttonsPosition().style}
-          >
-            <button
-              data-action
-              onClick={() => handleConfirm('translate')}
-              class="p-2 bg-neutral-100 hover:bg-white text-neutral-900 rounded-md transition-colors shadow-lg"
-              title="Перевести (однократно)"
-            >
-              <Check size={16} />
-            </button>
-            <button
-              data-action
-              onClick={() => handleConfirm('persistent')}
-              class="p-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-md transition-colors shadow-lg"
-              title="Постоянный перевод"
-            >
-              <Pin size={16} />
-            </button>
-            <button
-              data-action
-              onClick={handleCancel}
-              class="p-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 rounded-md transition-colors shadow-lg border border-neutral-600"
-              title="Отмена"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        </Show>
-      </Show>
-
-      {/* Hint */}
-      <Show when={!rect()}>
-        <div class="absolute bottom-6 left-1/2 -translate-x-1/2 text-neutral-400 text-sm">
-          Выделите область для перевода
-        </div>
-      </Show>
-    </div>
-  );
+			{/* Hint */}
+			<Show when={!rect()}>
+				<div class='absolute bottom-6 left-1/2 -translate-x-1/2 text-muted-foreground text-lg'>
+					Выделите область для перевода
+				</div>
+			</Show>
+		</div>
+	);
 }

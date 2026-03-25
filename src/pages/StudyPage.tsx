@@ -6,6 +6,8 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useHeader } from '@/shared/hooks/useHeader';
 import { setLayoutStore } from '@/shared/stores/layout';
+import { Progress } from '@/components/ui/Progres';
+import { log } from '@/shared/lib/log';
 
 export function StudyPage() {
   const [words, setWords] = createSignal<FlashcardWord[]>([]);
@@ -43,7 +45,7 @@ export function StudyPage() {
     if (!word) return;
 
     try {
-      await invoke('update_word_progress', { wordId: word.id, correct });
+      await invoke('update_word_progress', { wordId: word.id, quality: correct ? 5 : 1 });
     } catch (e) {
       console.error('Failed to update progress:', e);
     }
@@ -64,19 +66,11 @@ export function StudyPage() {
   };
 
   const progress = () => (currentIndex() / Math.max(words().length, 1)) * 100;
-
   return (
 		<div class='h-full flex flex-col'>
-			{/* Progress */}
-			<div class='h-1 bg-neutral-800 rounded-full mb-6 overflow-hidden '>
-				<div
-					class='h-full bg-neutral-400 transition-all duration-300'
-					style={{ width: `${progress()}%` }}
-				/>
-			</div>
+			<Progress value={progress()} />
 
-			{/* Content */}
-			<div class='flex-1 flex items-center justify-center'>
+			<div class='flex-1 flex items-center justify-center pb-22'>
 				<Show
 					when={!loading()}
 					fallback={
@@ -91,9 +85,7 @@ export function StudyPage() {
 									<div class='flex justify-center mb-4 text-neutral-500'>
 										<Zap size={48} />
 									</div>
-									<h2 class='text-lg font-semibold text-neutral-100 mb-2'>
-										Отлично!
-									</h2>
+									<h2 class='text-lg font-semibold  mb-2'>Отлично!</h2>
 									<p class='text-neutral-400 mb-6'>Нет слов для повторения</p>
 									<Button onClick={restartSession} class='gap-1.5'>
 										<RefreshCcw size={16} />
@@ -111,7 +103,7 @@ export function StudyPage() {
 										<div class='flex justify-center mb-4 text-amber-400'>
 											<Zap size={48} />
 										</div>
-										<h2 class='text-lg font-semibold text-neutral-100 mb-2'>
+										<h2 class='text-lg font-semibold  mb-2'>
 											Сессия завершена
 										</h2>
 										<div class='flex gap-4 justify-center mb-4'>
@@ -146,7 +138,7 @@ export function StudyPage() {
 											{showAnswer() ? 'Перевод' : 'Как переводится?'}
 										</div>
 										<div
-											class={`text-2xl font-semibold ${showAnswer() ? 'text-neutral-400' : 'text-neutral-100'}`}
+											class={`text-2xl font-semibold ${showAnswer() ? 'text-neutral-400' : ''}`}
 										>
 											{showAnswer()
 												? currentWord()?.translation

@@ -1,36 +1,18 @@
 
-
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use std::sync::{Arc, Mutex};
 
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use ct2rs::{Config as Ct2rsConfig, TranslationOptions};
+use ct2rs::{ComputeType, Config as Ct2rsConfig, Device, TranslationOptions};
 use ct2rs::tokenizers::auto::Tokenizer as AutoTokenizer;
 use ct2rs::Translator;
 
 use crate::get_resource_dir;
 
-/// Информация о языковой модели
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ModelInfo {
-    pub id: String,
-    pub name: String,
-    pub source_lang: String,
-    pub target_lang: String,
-    pub size_mb: u64,
-    pub url: String,
-    pub local_path: Option<PathBuf>,
-    pub is_downloaded: bool,
-}
 
-
-static ACTIVE_MODEL: Lazy<Arc<Mutex<Option<String>>>> = Lazy::new(|| Arc::new(Mutex::new(None)));
-
-
-/// Простая локальная реализация перевода на основе словаря с морфологией
-/// Используется как fallback когда нет нейросетевых моделей
 pub mod simple {
     use std::collections::HashMap;
 
@@ -127,8 +109,10 @@ pub mod simple {
 static SIMPLE_TRANSLATOR: Lazy<simple::SimpleTranslator> = Lazy::new(simple::SimpleTranslator::new);
 
 type AutoCt2rsTranslator = Translator<AutoTokenizer>;
-static CT2RS_ACTIVE_TRANSLATOR: Lazy<Mutex<Option<(String, AutoCt2rsTranslator)>>> =
-    Lazy::new(|| Mutex::new(None));
+
+static TRANSLATORS: Lazy<Mutex<HashMap<String, Arc<AutoCt2rsTranslator>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
 
 fn ct2rs_model_id(from: &str, to: &str) -> Option<&'static str> {
     match (from, to) {
@@ -137,6 +121,7 @@ fn ct2rs_model_id(from: &str, to: &str) -> Option<&'static str> {
         _ => None,
     }
 }
+
 
 
 pub fn translate_local_translator(
@@ -148,30 +133,41 @@ pub fn translate_local_translator(
         .ok_or_else(|| format!("Unsupported language pair: {} -> {}", from, to))?;
 
     let root_dir = get_resource_dir().join("translate-model");
-
     let model_path = root_dir.join(model_id);
+
     if !model_path.exists() {
         return Err(format!("Model {} not downloaded", model_id));
     }
 
-    let mut guard = CT2RS_ACTIVE_TRANSLATOR.lock().map_err(|e| e.to_string())?;
-    let needs_restart = guard.as_ref().map(|(id, _)| id != model_id).unwrap_or(true);
-    if needs_restart {
-        let translator = AutoCt2rsTranslator::new(&model_path, &Ct2rsConfig::default())
-            .map_err(|e| e.to_string())?;
-        *guard = Some((model_id.to_string(), translator));
-    }
+    let translator = {
+        let mut map = TRANSLATORS.lock().map_err(|e| e.to_string())?;
 
-    let translator = &guard
-        .as_mut()
-        .ok_or_else(|| "Translator not available".to_string())?
-        .1;
+        if !map.contains_key(model_id) {
+            let config = Ct2rsConfig {
+                device: Device::CPU,
+                compute_type: ComputeType::INT8,
+                num_threads_per_replica: 4,
+                max_queued_batches: 8,
+                ..Default::default()
+            };
+
+            let translator = AutoCt2rsTranslator::new(&model_path, &config)
+                .map_err(|e| e.to_string())?;
+
+            map.insert(model_id.to_string(), Arc::new(translator));
+        }
+
+        map.get(model_id).unwrap().clone()
+    };
 
     let options = TranslationOptions {
         beam_size: 1,
+        max_decoding_length: 128,
         ..Default::default()
     };
+
     let sources = vec![text];
+
     let results = translator
         .translate_batch(&sources, &options, None)
         .map_err(|e| e.to_string())?;
@@ -179,7 +175,7 @@ pub fn translate_local_translator(
     Ok(results
         .first()
         .map(|(s, _)| s.clone())
-        .unwrap_or_else(|| String::new()))
+        .unwrap_or_default())
 }
 
 

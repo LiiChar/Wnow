@@ -1,4 +1,5 @@
 
+import { Button } from '@/components/ui/Button';
 import { layoutStore } from '@/shared/stores/layout';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import {X} from 'lucide-solid'
@@ -28,7 +29,7 @@ export const Header = () => {
 				>
 					<div class='flex items-center gap-2 relative z-10 pointer-events-none'>
 						<div>
-							<h1 class='text-xl font-semibold text-neutral-100'>
+							<h1 class='text-xl font-semibold '>
 								{layoutStore.headerLabel}
 							</h1>
 							<Show when={layoutStore.headerDescription}>
@@ -38,12 +39,13 @@ export const Header = () => {
 					</div>
 
 					<div class='flex items-center relative z-10'>
-						<button
+						<Button
 							onClick={handleCloseApp}
-							class='p-2 text-neutral-400 hover:text-red-400 hover:bg-neutral-800 rounded transition-colors'
+							class='p-2 aspect-square rounded transition-colors'
+							variant={'ghost'}
 						>
 							<X size={14} />
-						</button>
+						</Button>
 					</div>
 				</div>
 			</header>

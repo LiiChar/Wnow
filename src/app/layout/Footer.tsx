@@ -13,7 +13,7 @@ export const Footer = () => {
 
   return (
 		<nav class=' bottom-2 flex justify-center fixed w-full'>
-			<div class='flex justify-center p-2 gap-2 max-w-md mx-auto bg-muted/20 backdrop-blur-lg rounded-full border-border border-2'>
+			<div class='flex justify-center p-2 gap-2 max-w-md mx-auto bg-muted/20 backdrop-blur-lg rounded-full border-border border'>
 				<A
 					class={cn(
 						'flex justify-center items-center p-3 rounded-full ',

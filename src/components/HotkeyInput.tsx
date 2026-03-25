@@ -1,5 +1,6 @@
 import { Keyboard } from 'lucide-solid';
 import { createSignal, Show } from 'solid-js';
+import { Button } from './ui/Button';
 
 interface HotkeyInputProps {
   label: string;
@@ -63,23 +64,18 @@ export function HotkeyInput(props: HotkeyInputProps) {
     <div class="flex flex-col gap-1.5">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <span class="text-sm text-neutral-300">{props.label}</span>
+          <span class="text-sm text-muted-foreground">{props.label}</span>
           <Show when={props.description}>
-            <span class="text-xs text-neutral-500">({props.description})</span>
+            <span class="text-xs ">({props.description})</span>
           </Show>
         </div>
         
-        <button
+        <Button
           onClick={startRecording}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
-          class={`
-            flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-mono
-            transition-all duration-200 min-w-[120px] justify-center
-            ${isRecording() 
-              ? 'bg-neutral-700 border-2 border-neutral-500 text-neutral-100 animate-pulse' 
-              : 'bg-neutral-800 border border-neutral-700 text-neutral-300 hover:bg-neutral-700 hover:border-neutral-600'}
-          `}
+          variant={'outline'}
+          class={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-mono transition-all duration-200 min-w-[120px] justify-center`}
         >
           <Show when={isRecording()} fallback={
             <>
@@ -87,11 +83,11 @@ export function HotkeyInput(props: HotkeyInputProps) {
               {props.value}
             </>
           }>
-            <span class="text-neutral-400">
+            <span class="">
               {tempValue() || 'Нажмите клавиши...'}
             </span>
           </Show>
-        </button>
+        </Button>
       </div>
     </div>
   );

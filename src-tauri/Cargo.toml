@@ -47,6 +47,8 @@ tauri-plugin-store = "2"
 tauri-plugin-clipboard-manager = "2"
 ocr-rs = "2.2.0"
 regex = "1.12.3"
+rand = "0.10.0"
+rdev = "0.5.3"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["winuser", "windef"] }

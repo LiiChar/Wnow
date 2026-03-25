@@ -12,9 +12,9 @@ export function Layout(props: ParentProps) {
 	});
 
 	return (
-		<div class='fixed inset-0 flex flex-col overflow-hidden interface'>
+		<div class='flex flex-col h-full overflow-auto interface'>
 			<Header />
-			<main class='flex-1 overflow-y-auto'>{props.children}</main>
+			<main class='flex-1 overflow-y-auto p-2 '>{props.children}</main>
 			<ToastRegion>
 				<ToastListWithToasts />
 			</ToastRegion>

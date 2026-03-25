@@ -1,7 +1,6 @@
 import {
 	createSignal,
 	Show,
-	For,
 	onMount,
 	onCleanup,
 } from 'solid-js';
@@ -11,10 +10,7 @@ import { invoke } from '@tauri-apps/api/core';
 
 import { SelectionArea, SelectionMode } from '../../components/overlay/SelectionArea';
 import { BoxCanvas } from '../../components/box/BoxCanvas';
-import {
-	FloatingTranslation,
-	FloatingTranslationData,
-} from '../../components/FloatingTranslation';
+import { FloatingTranslation, type FloatingTranslationType } from '../../components/overlay/FloatingTranslation';
 import { TextBox } from '../../shared/types/ocr';
 import { Check, Copy, FoldVertical, Trash } from 'lucide-solid';
 import { toaster } from '@kobalte/core/toast';
@@ -33,9 +29,8 @@ export function TranslatorOverlay(props: TranslatorOverlayProps) {
 	const [fullCopied, setFullCopied] = createSignal(false);
 	const [isCompactMode, setIsCompactMode] = createSignal(true);
 
-	const [floatingTranslations, setFloatingTranslations] = createSignal<
-		FloatingTranslationData[]
-	>([]);
+	const [floatingTranslation, setFloatingTranslation] =
+		createSignal<FloatingTranslationType | null>(null);
 
 	const setCursorEvents = (enabled: boolean) => {
 		getCurrentWebviewWindow().setIgnoreCursorEvents(!enabled);
@@ -74,41 +69,16 @@ export function TranslatorOverlay(props: TranslatorOverlayProps) {
 		});
 	});
 
-	const translateFullText = async (text: string) => {
-		try {
-			const result = await invoke<string>('translate_text', { text });
-			return result;
-		} catch (e) {
-			console.error('translateFullText error:', e);
-			return text;
-		}
-	};
-
 	const closeAll = () => {
-		if (!isSelectFragment()) {
+		if ((!isSelectFragment() || showFullTranslation()) && floatingTranslation() === null) {
 			setBoxes([]);
 			setShowFullTranslation(false);
 			setFullText('');
-			setFloatingTranslations([]);
+			setFloatingTranslation(null);
 			setCursorEvents(false);
 		}
 	};
 
-	const removeFloatingTranslation = (id: string) => {
-		setFloatingTranslations(prev => {
-			const next = prev.filter(t => t.id !== id);
-
-			if (next.length === 0 && !showFullTranslation() && boxes().length === 0) {
-				setCursorEvents(false);
-			}
-
-			return next;
-		});
-	};
-
-	const addFloatingTranslation = (data: FloatingTranslationData) => {
-		setFloatingTranslations(prev => [...prev, data]);
-	};
 
 	const copyFullText = () => {
 		navigator.clipboard.writeText(fullText());
@@ -124,21 +94,19 @@ export function TranslatorOverlay(props: TranslatorOverlayProps) {
 
 
 	return (
-		<main class='fixed inset-0 bg-transparent z-[9998]' onClick={closeAll}>
+		<main class='fixed inset-0 bg-transparent z-9998' onClick={closeAll}>
 			<BoxCanvas boxes={boxes} />
 
-			<For each={floatingTranslations()}>
-				{floatData => (
-					<FloatingTranslation
-						data={floatData}
-						onClose={removeFloatingTranslation}
-					/>
-				)}
-			</For>
+			<Show when={floatingTranslation() !== null}>
+				<FloatingTranslation
+					data={floatingTranslation()!}
+					onClose={() => setFloatingTranslation(null)}
+				/>
+			</Show>
 
 			<Show when={showFullTranslation() && fullText()}>
 				<div
-					class={`fixed z-[10002] ${
+					class={`fixed z-10002 ${
 						isCompactMode()
 							? 'bottom-4 right-4 max-w-xs'
 							: 'bottom-4 left-1/2 -translate-x-1/2 max-w-xl w-[90%]'
@@ -155,9 +123,7 @@ export function TranslatorOverlay(props: TranslatorOverlayProps) {
 									</button>
 								</div>
 
-								<p class='text-xs text-neutral-100 line-clamp-4'>
-									{fullText()}
-								</p>
+								<p class='text-xs  line-clamp-4'>{fullText()}</p>
 
 								<div class='flex gap-1 mt-2'>
 									<button onClick={copyFullText}>
@@ -181,9 +147,7 @@ export function TranslatorOverlay(props: TranslatorOverlayProps) {
 
 						<Show when={!isCompactMode()}>
 							<div class='p-3'>
-								<p class='text-sm text-neutral-100 whitespace-pre-wrap'>
-									{fullText()}
-								</p>
+								<p class='text-sm  whitespace-pre-wrap'>{fullText()}</p>
 							</div>
 
 							<div class='flex border-t border-neutral-800'>
@@ -223,19 +187,12 @@ export function TranslatorOverlay(props: TranslatorOverlayProps) {
 							if (!text && !resultBoxes.length) return;
 
 							if (mode === 'persistent') {
-								const translation = await translateFullText(text);
-
-								addFloatingTranslation({
-									id: `float-${Date.now()}`,
-									text,
-									translation,
-									x: rect.x,
-									y: rect.y,
-									w: rect.w,
-									h: rect.h,
+								setFloatingTranslation({
+									area: rect,
+									text: text,
 								});
 
-								setCursorEvents(true);
+								setCursorEvents(false);
 							} else {
 								setFullText(prev => (prev ? `${prev}\n\n${text}` : text));
 

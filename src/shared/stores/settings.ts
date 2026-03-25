@@ -1,6 +1,7 @@
 import { createSignal } from 'solid-js';
 import type { Store } from '@tauri-apps/plugin-store';
 import type { AppSettings } from '../types/storage';
+import { log } from '../lib/log';
 
 export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'dark',
@@ -75,9 +76,10 @@ export async function updateSettings(updates: Partial<AppSettings>) {
 
 export function applyTheme(theme: AppSettings['theme']) {
   const isDark = theme === 'dark' || 
-    (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   
-  document.documentElement.classList.toggle('dark', isDark);
+  log.info('Applying theme:', isDark ? 'dark' : 'light');
+  document.body.classList.toggle('dark', isDark);
 }
 
 export { settings, isLoaded };

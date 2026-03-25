@@ -6,8 +6,6 @@ use crate::ocr::{recognize_with_boxes, postprocess_ocr, OcrWord};
 use crate::capture::preprocess_for_tesseract_sys;
 use crate::translation::translate;
 use futures::future::join_all;
-use std::collections::HashMap;
-use regex::Regex;
 
 
 #[tauri::command]
@@ -31,7 +29,6 @@ pub async fn get_block_translate(
 
     let start = Instant::now();
 
-    // 🔥 1. Собираем все тексты
     let mut requests = Vec::new();
 
     requests.push(text.clone());

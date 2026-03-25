@@ -84,10 +84,10 @@ export function SettingsPage() {
 	};
 
 	return (
-		<div class='h-full flex flex-col gap-4 overflow-y-auto pb-4'>
+		<div class='h-full flex flex-col gap-2 overflow-y-auto'>
 			{/* Запуск приложения */}
 			<Card>
-				<CardHeader class='pb-3'>
+				<CardHeader class=''>
 					<div class='flex items-center gap-2'>
 						<div class='p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 shrink-0'>
 							<Play size={16} />
@@ -107,10 +107,17 @@ export function SettingsPage() {
 							options={startModeOptions}
 							optionValue='value'
 							optionTextValue='label'
-							value={startModeOptions.find(o => o.value === settings().start_mode)}
-							onChange={v => v && updateSettings({ start_mode: v.value as 'app' | 'overlay' })}
+							value={startModeOptions.find(
+								o => o.value === settings().start_mode,
+							)}
+							onChange={v =>
+								v &&
+								updateSettings({ start_mode: v.value as 'app' | 'overlay' })
+							}
 							itemComponent={props => (
-								<SelectItem item={props.item}>{props.item.rawValue.label}</SelectItem>
+								<SelectItem item={props.item}>
+									{props.item.rawValue.label}
+								</SelectItem>
 							)}
 						>
 							<SelectTrigger>
@@ -144,7 +151,7 @@ export function SettingsPage() {
 
 			{/* Внешний вид */}
 			<Card>
-				<CardHeader class='pb-3'>
+				<CardHeader>
 					<div class='flex items-center gap-2'>
 						<div class='p-1.5 rounded-lg bg-purple-500/10 text-purple-400 shrink-0'>
 							<Palette size={16} />
@@ -165,9 +172,16 @@ export function SettingsPage() {
 							optionValue='value'
 							optionTextValue='label'
 							value={themeOptions.find(o => o.value === settings().theme)}
-							onChange={v => v && updateSettings({ theme: v.value as 'light' | 'dark' | 'system' })}
+							onChange={v =>
+								v &&
+								updateSettings({
+									theme: v.value as 'light' | 'dark' | 'system',
+								})
+							}
 							itemComponent={props => (
-								<SelectItem item={props.item}>{props.item.rawValue.label}</SelectItem>
+								<SelectItem item={props.item}>
+									{props.item.rawValue.label}
+								</SelectItem>
 							)}
 						>
 							<SelectTrigger>
@@ -183,7 +197,7 @@ export function SettingsPage() {
 
 			{/* Языки */}
 			<Card>
-				<CardHeader class='pb-3'>
+				<CardHeader>
 					<div class='flex items-center gap-2'>
 						<div class='p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400 shrink-0'>
 							<Languages size={16} />
@@ -206,7 +220,9 @@ export function SettingsPage() {
 							value={langOptions.find(o => o.value === settings().source_lang)}
 							onChange={v => v && updateSettings({ source_lang: v.value })}
 							itemComponent={props => (
-								<SelectItem item={props.item}>{props.item.rawValue.label}</SelectItem>
+								<SelectItem item={props.item}>
+									{props.item.rawValue.label}
+								</SelectItem>
 							)}
 						>
 							<SelectTrigger>
@@ -226,7 +242,9 @@ export function SettingsPage() {
 							value={langOptions.find(o => o.value === settings().target_lang)}
 							onChange={v => v && updateSettings({ target_lang: v.value })}
 							itemComponent={props => (
-								<SelectItem item={props.item}>{props.item.rawValue.label}</SelectItem>
+								<SelectItem item={props.item}>
+									{props.item.rawValue.label}
+								</SelectItem>
 							)}
 						>
 							<SelectTrigger>
@@ -242,7 +260,7 @@ export function SettingsPage() {
 
 			{/* Движок перевода */}
 			<Card>
-				<CardHeader class='pb-3'>
+				<CardHeader>
 					<div class='flex items-center gap-2'>
 						<div class='p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 shrink-0'>
 							<Languages size={16} />
@@ -262,10 +280,14 @@ export function SettingsPage() {
 							options={translationModeOptions}
 							optionValue='value'
 							optionTextValue='label'
-							value={translationModeOptions.find(o => o.value === translationMode())}
+							value={translationModeOptions.find(
+								o => o.value === translationMode(),
+							)}
 							onChange={v => v && handleTranslationModeChange(v.value)}
 							itemComponent={props => (
-								<SelectItem item={props.item}>{props.item.rawValue.label}</SelectItem>
+								<SelectItem item={props.item}>
+									{props.item.rawValue.label}
+								</SelectItem>
 							)}
 						>
 							<SelectTrigger>
@@ -276,27 +298,30 @@ export function SettingsPage() {
 							<SelectContent />
 						</Select>
 					</div>
-					<div class='text-xs text-neutral-500 space-y-1.5 bg-neutral-900/50 rounded-lg p-3'>
+					<div class='text-xs text-muted-foreground space-y-1.5 bg-muted rounded-lg p-3'>
 						<p>
-							<strong class='text-neutral-300'>🔒 Локальный:</strong> Встроенный словарь + онлайн если слово не найдено
+							<strong>🔒 Локальный:</strong> Встроенный словарь + онлайн если
+							слово не найдено
 						</p>
 						<p>
-							<strong class='text-neutral-300'>🔐 Только офлайн:</strong> Только встроенный словарь (приватность)
+							<strong>🔐 Только офлайн:</strong> Только встроенный словарь
+							(приватность)
 						</p>
 						<p>
-							<strong class='text-neutral-300'>🌐 Только онлайн:</strong> Google Translate (точнее, но нужен интернет)
+							<strong>🌐 Только онлайн:</strong> Google Translate (точнее, но
+							нужен интернет)
 						</p>
 					</div>
-					<div class='p-3 bg-emerald-950/30 border border-emerald-800/50 rounded-lg'>
+					<div class='p-3  border border-emerald-800/50 rounded-lg'>
 						<div class='flex items-start gap-2'>
-							<Sparkles size={14} class='text-emerald-400 mt-0.5' />
+							<Sparkles size={40} class='text-emerald-400 -mt-2' />
 							<div>
 								<div class='text-xs text-emerald-400 font-medium mb-0.5'>
-									💡 Рекомендация
+									Рекомендация
 								</div>
-								<p class='text-xs text-neutral-400'>
-									Режим "Локальный" обеспечивает быстрый перевод частых слов офлайн,
-									а для сложных фраз использует онлайн-перевод.
+								<p class='text-xs '>
+									Режим "Локальный" обеспечивает быстрый перевод частых слов
+									офлайн, а для сложных фраз использует онлайн-перевод.
 								</p>
 							</div>
 						</div>
@@ -306,7 +331,7 @@ export function SettingsPage() {
 
 			{/* Горячие клавиши */}
 			<Card>
-				<CardHeader class='pb-3'>
+				<CardHeader>
 					<div class='flex items-center gap-2'>
 						<div class='p-1.5 rounded-lg bg-amber-500/10 text-amber-400 shrink-0'>
 							<KeyRound size={16} />
@@ -319,11 +344,8 @@ export function SettingsPage() {
 						</div>
 					</div>
 				</CardHeader>
-				<CardContent class='space-y-4'>
-					<div class='flex items-start gap-3 p-3 rounded-lg bg-neutral-900/30'>
-						<div class='p-2 rounded-md bg-neutral-800 text-neutral-400 shrink-0'>
-							<MousePointer2 size={16} />
-						</div>
+				<CardContent class='space-y-2'>
+					<div class='flex items-start gap-3 p-0 py-1 '>
 						<div class='flex-1'>
 							<HotkeyInput
 								label='Перевод слова под курсором'
@@ -333,10 +355,7 @@ export function SettingsPage() {
 						</div>
 					</div>
 
-					<div class='flex items-start gap-3 p-3 rounded-lg bg-neutral-900/30'>
-						<div class='p-2 rounded-md bg-neutral-800 text-neutral-400 shrink-0'>
-							<MousePointer size={16} />
-						</div>
+					<div class='flex items-start gap-3 p-0 py-1 '>
 						<div class='flex-1'>
 							<HotkeyInput
 								label='Выделить область'
@@ -346,10 +365,7 @@ export function SettingsPage() {
 						</div>
 					</div>
 
-					<div class='flex items-start gap-3 p-3 rounded-lg bg-neutral-900/30'>
-						<div class='p-2 rounded-md bg-neutral-800 text-neutral-400 shrink-0'>
-							<Monitor size={16} />
-						</div>
+					<div class='flex items-start gap-3 p-0 py-1 '>
 						<div class='flex-1'>
 							<HotkeyInput
 								label='Перевод всего экрана'
@@ -359,10 +375,7 @@ export function SettingsPage() {
 						</div>
 					</div>
 
-					<div class='flex items-start gap-3 p-3 rounded-lg bg-neutral-900/30'>
-						<div class='p-2 rounded-md bg-neutral-800 text-neutral-400 shrink-0'>
-							<Clipboard size={16} />
-						</div>
+					<div class='flex items-start gap-3 p-0 py-1 '>
 						<div class='flex-1'>
 							<HotkeyInput
 								label='Перевод выделенного текста'
@@ -374,15 +387,16 @@ export function SettingsPage() {
 						</div>
 					</div>
 
-					<p class='text-xs text-neutral-500 pt-2 border-t border-neutral-800'>
-						* Изменения горячих клавиш вступят в силу после перезапуска приложения
+					<p class='text-xs text-neutral-500 pt-2 border-t border-border'>
+						* Изменения горячих клавиш вступят в силу после перезапуска
+						приложения
 					</p>
 				</CardContent>
 			</Card>
 
 			{/* Поведение */}
 			<Card>
-				<CardHeader class='pb-3'>
+				<CardHeader>
 					<div class='flex items-center gap-2'>
 						<div class='p-1.5 rounded-lg bg-rose-500/10 text-rose-400 shrink-0'>
 							<Bell size={16} />
@@ -403,7 +417,7 @@ export function SettingsPage() {
 						<SwitchLabel class='flex-1 cursor-pointer'>
 							<div class='flex items-center justify-between'>
 								<div class='flex items-center gap-3'>
-									<div class='p-1.5 rounded-md bg-neutral-800 text-neutral-400'>
+									<div class='p-1.5 rounded-md '>
 										<Save size={14} />
 									</div>
 									<div>
@@ -427,7 +441,7 @@ export function SettingsPage() {
 						<SwitchLabel class='flex-1 cursor-pointer'>
 							<div class='flex items-center justify-between'>
 								<div class='flex items-center gap-3'>
-									<div class='p-1.5 rounded-md bg-neutral-800 text-neutral-400'>
+									<div class='p-1.5 rounded-md '>
 										<Bell size={14} />
 									</div>
 									<div>
@@ -451,7 +465,7 @@ export function SettingsPage() {
 						<SwitchLabel class='flex-1 cursor-pointer'>
 							<div class='flex items-center justify-between'>
 								<div class='flex items-center gap-3'>
-									<div class='p-1.5 rounded-md bg-neutral-800 text-neutral-400'>
+									<div class='p-1.5 rounded-md '>
 										<Monitor size={14} />
 									</div>
 									<div>
@@ -471,18 +485,11 @@ export function SettingsPage() {
 			</Card>
 
 			{/* Сброс настроек */}
-			<Card>
-				<CardFooter>
-					<Button
-						variant='outline'
-						onClick={handleResetSettings}
-						class='w-full'
-					>
-						<RotateCcw size={16} />
-						Сбросить настройки по умолчанию
-					</Button>
-				</CardFooter>
-			</Card>
+			<Button variant='outline' onClick={handleResetSettings} class='w-full'>
+				<RotateCcw size={16} />
+				Сбросить настройки по умолчанию
+			</Button>
+			<div class='pb-17 w-full '></div>
 		</div>
 	);
 }

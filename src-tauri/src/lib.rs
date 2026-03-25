@@ -20,6 +20,7 @@ pub use handlers::{show_translate, translate_word_at_cursor, translate_selected_
 pub use platform::set_window_topmost;
 pub use utils::{init_resource_dir, get_resource_dir};
 
+use crate::commands::common::start_global_mouse_stream;
 use crate::setup::register_shortcut_handler;
 
 /// Данные для popup с переводом слова
@@ -143,6 +144,7 @@ pub fn run() {
             commands::translation::is_model_available
         ])
         .setup(move |app| {
+            let window = app.get_webview_window("main").unwrap();
             init_resource_dir(&app.handle());
             register_shortcut_handler(&app.handle());
             setup::setup_database(&app.handle());
@@ -151,6 +153,8 @@ pub fn run() {
             setup::setup_main_window(&app.handle());
 
             setup::setup_tray(&app.handle())?;
+
+            start_global_mouse_stream(window);
 
             Ok(())
         })
