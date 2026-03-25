@@ -5,6 +5,7 @@ use tauri_plugin_log::log::{log, Level};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use enigo::{Enigo, Keyboard, Key, Settings};
 use crate::mouse::Mouse;
+use crate::ocr::OcrWord;
 use crate::platform::set_window_topmost;
 use crate::translation::translate;
 use crate::WordTranslation;
@@ -86,18 +87,14 @@ pub async fn translate_selected_text(app: &AppHandle) {
     let logical_x = (phys_x as f32 / scale) as i32;
     let logical_y = (phys_y as f32 / scale) as i32;
 
-    let result = WordTranslation {
-        word: text.to_string(),
-        translation,
-        context: String::new(),
-        context_translation: String::new(),
-        popup_x: logical_x,
-        popup_y: (logical_y - 60).max(10),
-        word_x: logical_x - 50,
-        word_y: logical_y - 10,
-        word_w: 100,
-        word_h: 20,
-    };
+    let result = vec![OcrWord {
+        text: text.to_string(),
+        translation: Some(translation),
+        x: logical_x,
+        y: logical_y,
+        w: 0,
+        h: 0,
+    }];
 
     if let Some(window) = app.get_webview_window("overlay") {
         window.set_ignore_cursor_events(false).ok();
@@ -105,5 +102,5 @@ pub async fn translate_selected_text(app: &AppHandle) {
         set_window_topmost(&window);
     }
 
-    app.emit_to("overlay", "translate_word", &result).ok();
+    app.emit_to("overlay", "show_translate", &result).ok();
 }

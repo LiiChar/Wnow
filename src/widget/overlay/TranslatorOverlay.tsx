@@ -70,7 +70,7 @@ export function TranslatorOverlay(props: TranslatorOverlayProps) {
 	});
 
 	const closeAll = () => {
-		if ((!isSelectFragment() || showFullTranslation()) && floatingTranslation() === null) {
+		if (!isSelectFragment() && floatingTranslation() === null) {
 			setBoxes([]);
 			setShowFullTranslation(false);
 			setFullText('');

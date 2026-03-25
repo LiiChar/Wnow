@@ -179,11 +179,7 @@ pub fn translate_local_translator(
 }
 
 
-pub fn translate_local_simple(text: &str, from: &str, to: &str) -> String {
+pub fn translate_local(text: &str, from: &str, to: &str) -> String {
     SIMPLE_TRANSLATOR.translate_text(text, from, to)
-}
-
-pub fn translate_word_local(word: &str, from: &str, to: &str) -> Option<String> {
-    SIMPLE_TRANSLATOR.translate_word(word, from, to)
 }
 

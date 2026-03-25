@@ -45,7 +45,7 @@ pub fn run() {
     let ctrl_t = Shortcut::new(Some(Modifiers::CONTROL), Code::KeyT);
     let ctrl_y = Shortcut::new(Some(Modifiers::CONTROL), Code::KeyY);
     let ctrl_u = Shortcut::new(Some(Modifiers::CONTROL), Code::KeyU);
-    let _ctrl_shift_c = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyC);
+    let ctrl_shift_c = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyC);
     let esc = Shortcut::new(Some(Modifiers::all()), Code::Escape);
 
     tauri::Builder::default()
@@ -94,18 +94,18 @@ pub fn run() {
                             _ => {}
                         }
                     }
-                    // if shortcut == &ctrl_shift_c {
-                    //     match event.state() {
-                    //         ShortcutState::Released => {
-                    //             let app_clone = app.clone();
-                    //             std::thread::spawn(move || {
-                    //                 let rt = tokio::runtime::Runtime::new().unwrap();
-                    //                 rt.block_on(translate_selected_text(&app_clone));
-                    //             });
-                    //         }
-                    //         _ => {}
-                    //     }
-                    // }
+                    if shortcut == &ctrl_shift_c {
+                        match event.state() {
+                            ShortcutState::Released => {
+                                let app_clone = app.clone();
+                                std::thread::spawn(move || {
+                                    let rt = tokio::runtime::Runtime::new().unwrap();
+                                    rt.block_on(translate_selected_text(&app_clone));
+                                });
+                            }
+                            _ => {}
+                        }
+                    }
                     if shortcut == &esc {
                         match event.state() {
                             ShortcutState::Released => {
@@ -144,7 +144,7 @@ pub fn run() {
             commands::translation::is_model_available
         ])
         .setup(move |app| {
-            let window = app.get_webview_window("main").unwrap();
+            // let window = app.get_webview_window("main").unwrap();
             init_resource_dir(&app.handle());
             register_shortcut_handler(&app.handle());
             setup::setup_database(&app.handle());
@@ -154,7 +154,7 @@ pub fn run() {
 
             setup::setup_tray(&app.handle())?;
 
-            start_global_mouse_stream(window);
+            // start_global_mouse_stream(window);
 
             Ok(())
         })

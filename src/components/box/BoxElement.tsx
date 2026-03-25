@@ -14,7 +14,7 @@ type BoxElementProps = {
 
 export const BoxElement = (props: BoxElementProps) => {
   const [isHovered, setIsHovered] = createSignal(false);
-  const [isSelected, setIsSelected] = createSignal(false);
+  const [isSelected, setIsSelected] = createSignal(props.box.w == 0 && props.box.h == 0);
 	const [added, setAdded] = createSignal(false);
 	const [copied, setCopied] = createSignal(false);
 
@@ -99,7 +99,7 @@ export const BoxElement = (props: BoxElementProps) => {
 
 			<Show when={isHovered() || isSelected()}>
 				<div
-					class='absolute z-50 left-1/2 -translate-x-1/2 animate-fade-in'
+					class='absolute z-50 left-1/2 -translate-x-1/2 animate-fade-in max-h-32'
 					style={{ bottom: `${props.box.h + padding * 2 + 8}px` }}
 					onClick={e => {
 						e.stopPropagation();

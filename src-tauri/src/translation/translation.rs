@@ -3,26 +3,26 @@ use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use reqwest::StatusCode;
 use thiserror::Error;
-use tauri_plugin_log::log::{log, Level};
 use tokio::time::sleep;
+use tauri_plugin_log::log::{log, Level};
 
 use super::local;
 
 const CACHE_TTL: Duration = Duration::from_secs(60 * 60 * 24);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(2); 
 const MAX_BATCH_SIZE: usize = 10; 
-const MAX_RETRIES: usize = 2;
+const MAX_RETRIES: usize = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TranslationMode {
-    LocalFirst,
+    OnlineFirst,
     OnlineOnly,
     OfflineOnly,
 }
 
 /// Текущий режим перевода
 static TRANSLATION_MODE: Lazy<std::sync::Mutex<TranslationMode>> = 
-    Lazy::new(|| std::sync::Mutex::new(TranslationMode::LocalFirst));
+    Lazy::new(|| std::sync::Mutex::new(TranslationMode::OfflineOnly));
 
 
 static HTTP_CLIENT: Lazy<reqwest::Client> = Lazy::new(|| {
@@ -61,7 +61,7 @@ pub fn set_translation_mode(mode: TranslationMode) {
 }
 
 pub fn get_translation_mode() -> TranslationMode {
-    TRANSLATION_MODE.lock().map(|m| *m).unwrap_or(TranslationMode::LocalFirst)
+    TRANSLATION_MODE.lock().map(|m| *m).unwrap_or(TranslationMode::OnlineFirst)
 }
 
 pub async fn translate(
@@ -80,47 +80,46 @@ pub async fn translate(
 
     let mode = get_translation_mode();
 
-    let is_single_word = !text_trimmed.contains(' ');
+    log!(Level::Info, "Translate mode: {:?}", mode.clone());
 
-    if mode != TranslationMode::OnlineOnly && is_single_word {
-        if let Some(translation) = local::translate_word_local(text_trimmed, from, to) {
-            cache_result(&cache_key, translation.clone());
-            return Ok(translation);
+    if mode == TranslationMode::OnlineFirst || mode != TranslationMode::OfflineOnly {
+        match online_translate(text.clone(), from, to).await {
+            Ok(translation) if !translation.is_empty() => {
+                cache_result(&cache_key, translation.clone());
+                return Ok(translation);
+            }
+            Err(e) => {
+                if mode == TranslationMode::OnlineFirst {
+                    let local_result = local::translate_local(&text, from, to);
+                    if local_result != text {
+                        cache_result(&cache_key, local_result.clone());
+                        return Ok(local_result);
+                    }
+                }
+                eprintln!("Online translation failed: {:?}", e);
+            }
+            _ => {}
         }
     }
 
-    if (mode == TranslationMode::LocalFirst || mode == TranslationMode::OfflineOnly) && !is_single_word {
+
+    if mode == TranslationMode::OnlineFirst || mode == TranslationMode::OfflineOnly {
         if let Ok(translated) = local::translate_local_translator(&text, from, to) {
             if !translated.is_empty() {
                 cache_result(&cache_key, translated.clone());
                 
                 return Ok(translated);
             }
-        }
-    }
-
-    if mode == TranslationMode::OfflineOnly {
-        let local_result = local::translate_local_simple(&text, from, to);
-        cache_result(&cache_key, local_result.clone());
-        return Ok(local_result);
-    }
-
-    match online_translate(text.clone(), from, to).await {
-        Ok(translation) if !translation.is_empty() => {
-            cache_result(&cache_key, translation.clone());
-            return Ok(translation);
-        }
-        Err(e) => {
-            if mode == TranslationMode::LocalFirst {
-                let local_result = local::translate_local_simple(&text, from, to);
+        } else {
+            if mode == TranslationMode::OnlineFirst {
+                let local_result = local::translate_local(&text, from, to);
                 if local_result != text {
                     cache_result(&cache_key, local_result.clone());
                     return Ok(local_result);
                 }
             }
-            eprintln!("Online translation failed: {:?}", e);
+            eprintln!("Local translation failed");
         }
-        _ => {}
     }
 
     Ok(format!("[{}]", text))
@@ -162,7 +161,7 @@ pub async fn translate_words_batch(
 
         // 2. Проверяем локальный словарь для известных слов
         if mode != TranslationMode::OnlineOnly {
-            if let Some(translation) = local::translate_word_local(&word_lower, from, to) {
+            if let translation = local::translate_local(&word_lower, from, to) {
                 cache_result(&cache_key, translation.clone());
                 results.push((word.clone(), translation));
                 continue;
@@ -243,6 +242,11 @@ pub async fn online_translate(text: String, from: &str, to: &str) -> Result<Stri
     // 🔥 retry loop
     for attempt in 0..=MAX_RETRIES {
         
+        if let Ok(res) = translate_google(&text, from, to).await {
+            if !res.is_empty() {
+                return Ok(res);
+            }
+        }
 
         if let Ok(res) = translate_mymemory(&text, from, to).await {
             if !res.is_empty() {
@@ -250,23 +254,18 @@ pub async fn online_translate(text: String, from: &str, to: &str) -> Result<Stri
             }
         }
 
-        if let Ok(res) = translate_deepl(&text, from, to).await {
-            if !res.is_empty() {
-                return Ok(res);
-            }
-        }
+        // if let Ok(res) = translate_deepl(&text, from, to).await {
+        //     if !res.is_empty() {
+        //         return Ok(res);
+        //     }
+        // }
 
-        if let Ok(res) = translate_libre(&text, from, to).await {
-            if !res.is_empty() {
-                return Ok(res);
-            }
-        }
+        // if let Ok(res) = translate_libre(&text, from, to).await {
+        //     if !res.is_empty() {
+        //         return Ok(res);
+        //     }
+        // }
 
-        if let Ok(res) = translate_google(&text, from, to).await {
-            if !res.is_empty() {
-                return Ok(res);
-            }
-        }
 
         if attempt < MAX_RETRIES {
             sleep(Duration::from_millis(200)).await;
@@ -377,7 +376,7 @@ async fn translate_libre(text: &str, from: &str, to: &str) -> Result<String, Tra
 
 async fn translate_google(text: &str, from: &str, to: &str) -> Result<String, TranslateError> {
     let url = format!(
-        "https://translate.googleapis.com/translate_a/single?client=gtx&sl={}&tl={}&dt=t&q={}",
+        "https://translate.googleapis.com/translate_a/single?client=gtx&sl={}&tl={}&dt=t&dt=bd&dj=1&q={}",
         from,
         to,
         urlencoding::encode(text)
