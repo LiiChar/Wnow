@@ -16,6 +16,7 @@ import { Check, Copy, FoldVertical, Trash } from 'lucide-solid';
 import { toaster } from '@kobalte/core/toast';
 import { ToastStatus } from '@/components/toaster/ToastStatus';
 import { log } from '@/shared/lib/log';
+import { getBlockTranslate } from '@/shared/api/translate';
 
 interface TranslatorOverlayProps {
 	onOpenApp: () => void;
@@ -179,9 +180,9 @@ export function TranslatorOverlay(props: TranslatorOverlayProps) {
 						setIsSelectFragment(false);
 
 						try {
-							const [text, resultBoxes] = await invoke<[string, TextBox[]]>(
-								'get_block_translate',
-								{ pos: [rect.x, rect.y], size: [rect.w, rect.h] },
+							const [text, resultBoxes] = await getBlockTranslate(
+								[rect.x, rect.y],
+								[rect.w, rect.h],
 							);
 
 							if (!text && !resultBoxes.length) return;

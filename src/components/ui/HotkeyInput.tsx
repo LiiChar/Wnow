@@ -1,6 +1,6 @@
 import { Keyboard } from 'lucide-solid';
 import { createSignal, Show } from 'solid-js';
-import { Button } from './ui/Button';
+import { Button } from './Button';
 
 interface HotkeyInputProps {
   label: string;

@@ -1,5 +1,4 @@
 import { createSignal, createEffect, Show } from 'solid-js';
-import { invoke } from '@tauri-apps/api/core';
 import type { FlashcardWord, LearningStats } from '../shared/types/storage';
 import { Check, RefreshCcw, X, Zap } from 'lucide-solid';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -7,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { useHeader } from '@/shared/hooks/useHeader';
 import { setLayoutStore } from '@/shared/stores/layout';
 import { Progress } from '@/components/ui/Progres';
-import { log } from '@/shared/lib/log';
+import { getLearningStats, getWordsForStudy, updateWordProgress } from '@/shared/api/stude';
 
 export function StudyPage() {
   const [words, setWords] = createSignal<FlashcardWord[]>([]);
@@ -23,8 +22,8 @@ export function StudyPage() {
     setLoading(true);
     try {
       const [wordsResult, statsResult] = await Promise.all([
-        invoke<FlashcardWord[]>('get_words_for_study', { limit: 20 }),
-        invoke<LearningStats>('get_learning_stats'),
+				getWordsForStudy(20),
+				getLearningStats(),
       ]);
       setWords(wordsResult);
       setStats(statsResult);
@@ -45,7 +44,7 @@ export function StudyPage() {
     if (!word) return;
 
     try {
-      await invoke('update_word_progress', { wordId: word.id, quality: correct ? 5 : 1 });
+			await updateWordProgress(word.id, correct ? 5 : 1);
     } catch (e) {
       console.error('Failed to update progress:', e);
     }
@@ -130,7 +129,7 @@ export function StudyPage() {
 						>
 							<div class='w-full max-w-md'>
 								<Card
-									class='cursor-pointer min-h-[280px] flex flex-col justify-center'
+									class='cursor-pointer min-h-70 flex flex-col justify-center'
 									onClick={() => setShowAnswer(!showAnswer())}
 								>
 									<CardContent class='p-8 text-center'>

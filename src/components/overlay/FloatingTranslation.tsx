@@ -1,5 +1,4 @@
-import { TextBox } from '@/shared/types/ocr';
-import { invoke } from '@tauri-apps/api/core';
+import { getBlockTranslate } from '@/shared/api/translate';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { createSignal, onMount, onCleanup, createEffect } from 'solid-js';
 
@@ -62,13 +61,7 @@ export function FloatingTranslation(props: Props) {
 	onMount(() => {
 		interval = setInterval(async () => {
 			try {
-				const [text] = await invoke<[string, TextBox[]]>(
-					'get_block_translate',
-					{
-						pos: [pos().x, pos().y],
-						size: [props.data.area.w, props.data.area.h],
-					},
-				);
+				const [text] = await getBlockTranslate([pos().x, pos().y], [props.data.area.w, props.data.area.h]);
 
 				setTranslation(text);
 			} catch (e) {

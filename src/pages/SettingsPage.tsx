@@ -1,15 +1,17 @@
 import { createSignal, onMount } from 'solid-js';
-import { invoke } from '@tauri-apps/api/core';
-import { HotkeyInput } from '../components/HotkeyInput';
+import { HotkeyInput } from '../components/ui/HotkeyInput';
 import { settings, updateSettings, DEFAULT_SETTINGS } from '../shared/stores/settings';
 import { LANGUAGES } from '../shared/types/storage';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/Card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Switch, SwitchControl, SwitchThumb, SwitchLabel } from '@/components/ui/Switch';
-import { Languages, Monitor, MousePointer, MousePointer2, Clipboard, Palette, Play, KeyRound, Bell, Save, RotateCcw, Sparkles } from 'lucide-solid';
+import { Languages, Monitor,Palette, Play, KeyRound, Bell, Save, RotateCcw, Sparkles } from 'lucide-solid';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select';
 import { useHeader } from '@/shared/hooks/useHeader';
 import { Button } from '@/components/ui/Button';
 import { createToast } from '@/components/ui/Toast';
+import { BottomPadding } from '@/components/layout/BottomPadding';
+import { getTranslationMode, setTranslationMode } from '@/shared/api/settings';
+import { Models } from '@/widget/settings/Models';
 
 interface SelectOption {
 	label: string;
@@ -17,14 +19,14 @@ interface SelectOption {
 }
 
 export function SettingsPage() {
-	const [translationMode, setTranslationMode] = createSignal<string>('local_first');
+	const [mode, setMode] = createSignal<string>('local_first');
 
 	useHeader('Настройки', 'Персонализация приложения');
 
 	onMount(async () => {
 		try {
-			const mode = await invoke<string>('get_current_translation_mode');
-			setTranslationMode(mode);
+			const mode = await getTranslationMode();
+			setMode(mode);
 		} catch (e) {
 			console.error('Failed to get translation mode:', e);
 		}
@@ -32,8 +34,8 @@ export function SettingsPage() {
 
 	const handleTranslationModeChange = async (mode: string) => {
 		try {
-			await invoke('set_translation_mode', { mode });
-			setTranslationMode(mode);
+			await setTranslationMode(mode);
+			setMode(mode);
 		} catch (e) {
 			console.error('Failed to set translation mode:', e);
 		}
@@ -51,7 +53,7 @@ export function SettingsPage() {
 	];
 
 	const translationModeOptions: SelectOption[] = [
-		{ label: '🔒 Локальный (с онлайн fallback)', value: 'local_first' },
+		{ label: '🔒 Онлайн (с офлайн fallback)', value: 'online_first' },
 		{ label: '🔐 Только офлайн', value: 'offline_only' },
 		{ label: '🌐 Только онлайн', value: 'online_only' },
 	];
@@ -148,7 +150,6 @@ export function SettingsPage() {
 					</Switch>
 				</CardContent>
 			</Card>
-
 			{/* Внешний вид */}
 			<Card>
 				<CardHeader>
@@ -194,7 +195,6 @@ export function SettingsPage() {
 					</div>
 				</CardContent>
 			</Card>
-
 			{/* Языки */}
 			<Card>
 				<CardHeader>
@@ -258,6 +258,7 @@ export function SettingsPage() {
 				</CardContent>
 			</Card>
 
+			<Models/>
 			{/* Движок перевода */}
 			<Card>
 				<CardHeader>
@@ -281,7 +282,7 @@ export function SettingsPage() {
 							optionValue='value'
 							optionTextValue='label'
 							value={translationModeOptions.find(
-								o => o.value === translationMode(),
+								o => o.value === mode(),
 							)}
 							onChange={v => v && handleTranslationModeChange(v.value)}
 							itemComponent={props => (
@@ -328,7 +329,6 @@ export function SettingsPage() {
 					</div>
 				</CardContent>
 			</Card>
-
 			{/* Горячие клавиши */}
 			<Card>
 				<CardHeader>
@@ -393,7 +393,6 @@ export function SettingsPage() {
 					</p>
 				</CardContent>
 			</Card>
-
 			{/* Поведение */}
 			<Card>
 				<CardHeader>
@@ -483,13 +482,12 @@ export function SettingsPage() {
 					</Switch>
 				</CardContent>
 			</Card>
-
 			{/* Сброс настроек */}
 			<Button variant='outline' onClick={handleResetSettings} class='w-full'>
 				<RotateCcw size={16} />
 				Сбросить настройки по умолчанию
 			</Button>
-			<div class='pb-17 w-full '></div>
+			<BottomPadding/>
 		</div>
 	);
 }

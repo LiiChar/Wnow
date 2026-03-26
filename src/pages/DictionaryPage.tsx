@@ -1,5 +1,4 @@
-import { createSignal, createEffect, For, Show } from 'solid-js';
-import { invoke } from '@tauri-apps/api/core';
+import { createSignal, For, Show, onMount } from 'solid-js';
 import type { SavedWord } from '../shared/types/storage';
 import { Input } from '@/components/ui/Input';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -10,19 +9,23 @@ import { useHeader } from '@/shared/hooks/useHeader';
 import { setLayoutStore } from '@/shared/stores/layout';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog';
 import { Alert } from '@/components/dialog/Alert';
+import { BottomPadding } from '@/components/layout/BottomPadding';
+import { Translate } from '@/widget/translate/Translate';
+import { getAllWords } from '@/shared/api/stude';
 
 export function DictionaryPage() {
   const [words, setWords] = createSignal<SavedWord[]>([]);
   const [search, setSearch] = createSignal('');
   const [loading, setLoading] = createSignal(true);
   const [selectedWord, setSelectedWord] = createSignal<SavedWord | null>(null);
+	const [open, setOpen] = createSignal(false);
   
   useHeader('Словарь', 'Словарь пуст');
 
   const loadWords = async () => {
     setLoading(true);
     try {
-      const result = await invoke<SavedWord[]>('get_all_words');
+      const result = await getAllWords();
       setWords(result);
       setLayoutStore('headerDescription', `${words().length} слово`);
     } catch (e) {
@@ -31,7 +34,9 @@ export function DictionaryPage() {
     setLoading(false);
   };
 
-  createEffect(() => { loadWords(); });
+  onMount(() => {
+		loadWords();
+	});
 
   const filteredWords = () => {
     const s = search().toLowerCase();
@@ -44,7 +49,7 @@ export function DictionaryPage() {
 
   const deleteWord = async (id: number) => {
     try {
-      await invoke('delete_word', { wordId: id });
+      await deleteWord(id);
       setWords(words().filter(w => w.id !== id));
       setLayoutStore('headerDescription', `${words().length} слов`);
       setSelectedWord(null);
@@ -61,7 +66,9 @@ export function DictionaryPage() {
   };
 
   return (
-		<div class='h-full flex flex-col gap-2'>
+		<div class='h-full flex flex-col gap-2 '>
+			<Translate/>
+
 			<Input
 				placeholder='Поиск...'
 				value={search()}
@@ -100,7 +107,7 @@ export function DictionaryPage() {
 									return (
 										<Card
 											class='cursor-pointer transition-colors'
-											onClick={() => setSelectedWord(word)}
+											onClick={() => {setSelectedWord(word); setOpen(true);}}
 										>
 											<CardContent>
 												<div class='flex items-center justify-between '>
@@ -121,11 +128,12 @@ export function DictionaryPage() {
 					</Show>
 				</Show>
 			</div>
-			<div class='pb-18 w-full '></div>
+			<BottomPadding/>
 
 			<Dialog
-				open={selectedWord() !== null}
+				open={open()}
 				onOpenChange={isOpen => {
+					setOpen(isOpen);
 					if (!isOpen) {
 						setSelectedWord(null);
 					}
@@ -166,8 +174,11 @@ export function DictionaryPage() {
 					<DialogFooter>
 						<Alert
 							onConfirm={() => {
-								setSelectedWord(null);
-								deleteWord(selectedWord()!.id);
+								const word = selectedWord();
+								if (!word) return;
+
+								deleteWord(word.id);
+								setOpen(false);
 							}}
 							title='Вы уверены?'
 						>

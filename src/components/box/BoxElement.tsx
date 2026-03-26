@@ -2,8 +2,8 @@ import { TextBox } from "@/shared/types/ocr";
 import { createSignal, Show } from "solid-js";
 import { ToastStatus } from "../toaster/ToastStatus";
 import { toaster } from "@kobalte/core/toast";
-import { invoke } from "@tauri-apps/api/core";
 import { Check, Copy, Plus } from "lucide-solid";
+import { addWordToStudy } from "@/shared/api/stude";
 
 type BoxElementProps = {
 	box: TextBox
@@ -33,14 +33,7 @@ export const BoxElement = (props: BoxElementProps) => {
 
 	const handleAddToStudy = async () => {
 		try {
-			await invoke('add_word_to_study', {
-				word: props.box.text,
-				translation: props.box.translation,
-				context: '',
-				contextTranslation: '',
-				screenshotBase64: null,
-			});
-			// Toast показывается в WordPopup
+			addWordToStudy(props.box.text, props.box.translation ?? props.box.text);
 		} catch (e) {
 			console.error('Failed to add word:', e);
 			toaster.show(props => (

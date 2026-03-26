@@ -4,7 +4,7 @@ use tauri_plugin_log::log::{log, Level};
 use crate::capture::Capture;
 use crate::ocr::{recognize_with_boxes, postprocess_ocr, OcrWord};
 use crate::capture::preprocess_for_tesseract_sys;
-use crate::translation::translate;
+use crate::translation::translate as t;
 use futures::future::join_all;
 
 
@@ -40,7 +40,7 @@ pub async fn get_block_translate(
     // 🔥 2. Параллельный перевод
     let futures = requests
         .into_iter()
-        .map(|t| translate(t, "en", "ru"));
+        .map(|text| t(text, "en", "ru"));
 
     let results = join_all(futures).await;
 
@@ -113,4 +113,9 @@ pub fn box_ocr(phys_x: i32, phys_y: i32, phys_w: i32, phys_h: i32, scale: f32,) 
     let clear_boxes = postprocess_ocr(boxes);
 
     (text, clear_boxes)
+}
+
+#[tauri::command]
+pub async fn translate(text: String, source_lang: &str, target_lang: &str) -> Result<String, String> {
+    t(text.clone(), source_lang, target_lang).await.or(Ok(text))
 }
