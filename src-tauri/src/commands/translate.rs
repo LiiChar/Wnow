@@ -53,6 +53,7 @@ pub fn get_block_translate(
     for (i, result) in results.into_iter().enumerate() {
         if let Ok(translated) = result {
             if i == 0 {
+                log!(Level::Info, "[translate] translated text: {}, source: {}", translated, text.clone());
                 translated_text = translated;
             } else {
                 let b = &clear_boxes[i - 1];

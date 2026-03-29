@@ -104,24 +104,24 @@ pub async fn translate(
     }
 
 
-    if mode == TranslationMode::OnlineFirst || mode == TranslationMode::OfflineOnly {
-        if let Ok(translated) = local::translate_local_translator(&text, from, to) {
-            if !translated.is_empty() {
-                cache_result(&cache_key, translated.clone());
+    // if mode == TranslationMode::OnlineFirst || mode == TranslationMode::OfflineOnly {
+    //     if let Ok(translated) = local::translate_local_translator(&text, from, to) {
+    //         if !translated.is_empty() {
+    //             cache_result(&cache_key, translated.clone());
                 
-                return Ok(translated);
-            }
-        } else {
-            if mode == TranslationMode::OnlineFirst {
-                let local_result = local::translate_local(&text, from, to);
-                if local_result != text {
-                    cache_result(&cache_key, local_result.clone());
-                    return Ok(local_result);
-                }
-            }
-            eprintln!("Local translation failed");
-        }
-    }
+    //             return Ok(translated);
+    //         }
+    //     } else {
+    //         if mode == TranslationMode::OnlineFirst {
+    //             let local_result = local::translate_local(&text, from, to);
+    //             if local_result != text {
+    //                 cache_result(&cache_key, local_result.clone());
+    //                 return Ok(local_result);
+    //             }
+    //         }
+    //         eprintln!("Local translation failed");
+    //     }
+    // }
 
     Ok(format!("[{}]", text))
 }
@@ -381,7 +381,7 @@ async fn translate_google(
     to: &str,
 ) -> Result<String, TranslateError> {
     let url = format!(
-        "https://translate.googleapis.com/translate_a/single?client=gtx&sl={}&tl={}&dt=t&dj=1&q={}",
+        "https://translate.googleapis.com/translate_a/single?client=gtx&sl={}&tl={}&&dt=t&dt=bd&dt=rm&dj=1&q={}",
         from,
         to,
         urlencoding::encode(text)
@@ -406,8 +406,13 @@ async fn translate_google(
         .await
         .map_err(|e| TranslateError::Translate(format!("JSON error: {}", e)))?;
 
-    Ok(json["sentences"][0]["trans"]
-        .as_str()
-        .unwrap_or("")
-        .to_string())
+    let result = json["sentences"]
+        .as_array()
+        .unwrap_or(&vec![])
+        .iter()
+        .filter_map(|s| s["trans"].as_str())
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    Ok(result)
 }

@@ -78,12 +78,9 @@ pub fn recognize_with_boxes(
         }
     };
 
-    let text = engine.recognize_text(&image::DynamicImage::ImageRgb8(img)).expect("Error by recognize full text");
-
-    
     let mut words = Vec::with_capacity(results.len());
+    let mut text = String::new();
 
-    let uniq_id = fnv1a_hash(text.text.clone().as_bytes());
     for r in results {
         if r.text.is_empty() {
             continue;
@@ -92,7 +89,7 @@ pub fn recognize_with_boxes(
         let rect = &r.bbox.rect;
 
         words.push(OcrWord {
-            id: Some(uniq_id.to_string()),
+            id: None,
             x: (rect.left() as f32 / scale) as i32,
             y: (rect.top() as f32 / scale) as i32,
             w: (rect.width() as f32 / scale) as i32,
@@ -100,9 +97,12 @@ pub fn recognize_with_boxes(
             text: r.text.clone(),
             translation: None,
         });
+
+        text.push_str(r.text.as_str());
+        text.push(' ');
     }
 
-    (text.text, words)
+    (text, words)
 }
 
 // static _OCR_ENGINE: OnceLock<OcrEngineNew> = OnceLock::new();

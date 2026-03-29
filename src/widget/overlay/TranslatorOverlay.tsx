@@ -58,7 +58,9 @@ export function TranslatorOverlay() {
 			setIsSelectFragment(true);
 		});
 
-		add<void>('close_translate', () => setFloatingTranslation(null));
+		add<void>('close_translate', () => {
+			setFloatingTranslation(null);
+		});
 
 		onCleanup(() => {
 			unsubs.forEach(fn => fn());
@@ -183,8 +185,7 @@ export function TranslatorOverlay() {
 								);
 
 								log.info(
-									'[LAYOUT][EVENT][translate_fragment]Translate fragment with payload: ' +
-										JSON.stringify(resultBoxes),
+									'[LAYOUT][EVENT][translate_fragment]Translate fragment with payload: text= ' + text + ', resultBoxes= ' + JSON.stringify(resultBoxes),
 								);
 
 								if (!text && !resultBoxes.length) return;

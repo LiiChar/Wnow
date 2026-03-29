@@ -22,6 +22,7 @@ pub use utils::{init_resource_dir, get_resource_dir};
 pub use windows::windows::create_main_window;
 
 use crate::commands::common::start_global_mouse_stream;
+use crate::commands::translate::stop_floating_translate;
 use crate::setup::register_shortcut_handler;
 use crate::windows::windows::create_overlay_window;
 
@@ -95,6 +96,7 @@ pub fn run() {
                         match event.state() {
                             ShortcutState::Released => {
                                 app.emit_to("overlay", "close_translate", ()).ok();
+                                stop_floating_translate();
                             }
                             _ => {}
                         }

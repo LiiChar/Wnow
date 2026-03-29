@@ -5,6 +5,9 @@ import { createSignal, onMount, onCleanup, createEffect, For, Show } from 'solid
 import fitty from 'fitty';
 import { log } from '@/shared/lib/log';
 import { listen } from '@tauri-apps/api/event';
+import concaveman from 'concaveman';
+import roundPolygon, { getSegments } from 'round-polygon';
+import { groupBoxes, GroupedBox } from '@/shared/lib/points';
 
 export type Area = {
 	x: number;
@@ -43,8 +46,58 @@ export function isInBox(
 	);
 }
 
+interface BoxPolygonProps {
+	boxes: TextBox[];
+}
+
+export const BoxPolygon = (props: BoxPolygonProps) => {
+	if (!props.boxes.length) return null;
+
+	const allPoints: [number, number][] = [];
+	props.boxes.forEach(b => {
+		allPoints.push([b.x, b.y]); // левый верх
+		allPoints.push([b.x + b.w, b.y]); // правый верх
+		allPoints.push([b.x + b.w, b.y + b.h]); // правый низ
+		allPoints.push([b.x, b.y + b.h]); // левый низ
+	});
+
+	// concave hull, concavity=2 → чем меньше, тем точнее повторяет форму
+	let hull = concaveman(allPoints, 2);
+
+	hull.pop();
+
+	// преобразуем в формат для round-polygon
+	const polygonPoints = hull.map(([x, y]) => ({ x, y }));
+
+	// скругляем углы (радиус = 12px)
+	const rounded = roundPolygon(polygonPoints, 6);
+
+	// получаем сегменты для отрисовки
+	const segments = getSegments(rounded, 'LENGTH', 5);
+
+	// строка для SVG polygon
+	const pointsAttr = segments.map(p => `${p.x},${p.y}`).join(' ');
+
+	return (
+		<svg
+			class='absolute inset-0 pointer-events-none'
+			width='100vw'
+			height='100vh'
+		>
+			<polygon
+				points={pointsAttr}
+				fill='rgba(0,0,0,0.9)'
+				stroke='rgba(0,0,0,0.4)'
+				stroke-width={2}
+				stroke-linejoin='round'
+				stroke-linecap='round'
+			/>
+		</svg>
+	);
+};
+
 export function FloatingTranslation(props: Props) {
-	const [translation, setTranslation] = createSignal<TextBox[]>([]);
+	const [translation, setTranslation] = createSignal<GroupedBox[]>([]);
 
 
 
@@ -65,7 +118,10 @@ export function FloatingTranslation(props: Props) {
 					JSON.stringify(payload),
 			);
 
-			setTranslation(payload[1]);
+			let grouped = groupBoxes(payload[1]);
+
+
+			setTranslation(grouped);
 		});
 
 		await startFloatingTranslate([props.data.area.x, props.data.area.y], [props.data.area.w, props.data.area.h]);
@@ -89,25 +145,20 @@ export function FloatingTranslation(props: Props) {
 					height: `${props.data.area.h}px`,
 				}}
 			>
+				<For each={translation()}>{item => <BoxPolygon boxes={item.boxes} />}</For>
 				<For each={translation()}>
 					{box => {
 						return (
 							<div
-								ref={el => {
-									// fitty(el);
-									// if (el) {
-									// 	fitTextToBox(el, box.translation ?? box.text);
-									// }
-								}}
-								class='absolute border border-border bg-background/90 rounded overflow-hidden flex items-center justify-center text-center'
+								class='absolute overflow-hidden p-1'
 								style={{
-									left: `${box.x}px`,
-									top: `${box.y}px`,
-									width: `${box.w}px`,
-									height: `${box.h}px`,
+									left: `${box.grouped.x}px`,
+									top: `${box.grouped.y}px`,
+									width: `${box.grouped.w}px`,
+									height: `${box.grouped.h}px`,
 								}}
 							>
-								{box.translation ?? box.text}
+								{box.grouped.translation ?? box.grouped.text}
 							</div>
 						);
 					}}
