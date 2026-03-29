@@ -85,14 +85,14 @@ export const BoxElement = (props: BoxElementProps) => {
 		>
 			<div
 				class='absolute inset-0 rounded transition-all duration-150'
-				style={{
-					background: isHovered()
-						? 'rgba(163, 163, 163, 0.25)'
-						: 'rgba(163, 163, 163, 0.1)',
-					border: isHovered()
-						? '1.5px solid rgba(163, 163, 163, 0.8)'
-						: '1px solid rgba(163, 163, 163, 0.4)',
-				}}
+				// style={{
+				// 	background: isHovered()
+				// 		? 'rgba(163, 163, 163, 0.25)'
+				// 		: 'rgba(163, 163, 163, 0.1)',
+				// 	border: isHovered()
+				// 		? '1.5px solid rgba(163, 163, 163, 0.8)'
+				// 		: '1px solid rgba(163, 163, 163, 0.4)',
+				// }}
 			/>
 
 			<Show when={isHovered() || isSelected()}>

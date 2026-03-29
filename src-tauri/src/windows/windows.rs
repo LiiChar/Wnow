@@ -80,7 +80,7 @@ pub fn create_overlay_window(
     let monitor = monitors
         .iter()
         .find(|m| m.is_primary().unwrap() == true)
-        .unwrap_or(monitors.get(1).expect("Cannot find any monitor"));
+        .unwrap_or(monitors.get(0).expect("Cannot find any monitor"));
     let scale = monitor.scale_factor().unwrap();
     window.set_position(LogicalPosition { x: monitor.x().unwrap() as f32 * scale, y: monitor.y().unwrap() as f32 * scale })?;
     window.set_size(LogicalSize { width: monitor.width().unwrap() as f32, height: monitor.height().unwrap() as f32 })?;

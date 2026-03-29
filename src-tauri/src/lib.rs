@@ -124,6 +124,8 @@ pub fn run() {
             commands::database::save_settings,
             commands::translate::translate,
             commands::translate::get_block_translate,
+            commands::translate::stop_floating_translate,
+            commands::translate::start_floating_translate,
             commands::translation::set_translation_mode,
             commands::translation::get_current_translation_mode,
             commands::translation::get_translation_models,

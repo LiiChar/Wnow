@@ -21,3 +21,14 @@ export const translate = async (text: string, sourceLang: string, targetLang: st
 	const translation = await invoke<string>('translate', { text, sourceLang, targetLang });
 	return translation;
 };
+
+export const startFloatingTranslate = async (position: PosTranslateBlock, size: SizeTranslateBlock) => {
+	await invoke('start_floating_translate', {
+		pos: position,
+		size,
+	});
+};
+
+export const stopFloatingTranslate = async () => {
+	await invoke('stop_floating_translate');
+};

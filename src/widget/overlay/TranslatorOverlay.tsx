@@ -6,7 +6,6 @@ import {
 } from 'solid-js';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
-import { invoke } from '@tauri-apps/api/core';
 
 import { SelectionArea, SelectionMode } from '../../components/overlay/SelectionArea';
 import { BoxCanvas } from '../../components/box/BoxCanvas';
@@ -17,7 +16,6 @@ import { toaster } from '@kobalte/core/toast';
 import { ToastStatus } from '@/components/toaster/ToastStatus';
 import { log } from '@/shared/lib/log';
 import { getBlockTranslate } from '@/shared/api/translate';
-import { get } from 'node:http';
 
 
 export function TranslatorOverlay() {
@@ -45,6 +43,7 @@ export function TranslatorOverlay() {
 			const un = await listen<T>(event, handler);
 			unsubs.push(un);
 		};
+
 
 		add<TextBox[]>('show_translate', ({ payload }) => {
 			log.info('[LAYOUT][EVENT][show_translate]Listened to show_translate event with payload: ' + JSON.stringify(payload));
@@ -93,7 +92,7 @@ export function TranslatorOverlay() {
 	return (
 			<main class='fixed inset-0 z-9998' onClick={closeAll}>
 				<Show when={boxes().length > 0}>
-					<BoxCanvas boxes={boxes} />
+					<BoxCanvas boxes={boxes} text={fullText}/>
 				</Show>
 
 				<Show when={floatingTranslation() !== null}>

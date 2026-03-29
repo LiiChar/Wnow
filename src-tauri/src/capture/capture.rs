@@ -1,9 +1,9 @@
-use repng;
 use scrap::{Capturer, Display};
-use std::{fs::File, thread, time::Duration};
 pub struct Capture {
     capturer: Capturer,
 }
+
+
 
 impl Capture {
     pub fn new() -> Self {
