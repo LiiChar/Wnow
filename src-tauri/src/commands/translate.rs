@@ -1,13 +1,31 @@
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
-use image::{GrayImage, RgbaImage};
-use tauri::{WebviewWindow};
+use std::cell::RefCell;
+use std::time::Instant;
+use image::RgbaImage;
+use tauri::WebviewWindow;
 use tauri_plugin_log::log::{log, Level};
-use crate::capture::Capture;
 use crate::get_resource_dir;
-use crate::ocr::{OcrWord, postprocess_ocr, preprocess_for_rapid_ocr, preprocess_for_tesseract_sys, recognize_with_boxes};
+use crate::ocr::{OcrWord, postprocess_ocr, preprocess_for_tesseract_sys, recognize_with_boxes};
 use crate::translation::translate as t;
 use crate::utils::fnv1a_hash;
 use futures::future::join_all;
+
+thread_local! {
+    static CAPTURE: RefCell<Option<crate::capture::Capture>> = const { RefCell::new(None) };
+}
+
+fn with_capture<F, R>(f: F) -> Result<R, String>
+where
+    F: FnOnce(&mut crate::capture::Capture) -> R,
+{
+    CAPTURE.with(|capture_cell| {
+        let mut capture_opt = capture_cell.borrow_mut();
+        if capture_opt.is_none() {
+            *capture_opt = Some(crate::capture::Capture::new());
+        }
+        let capture = capture_opt.as_mut().ok_or("Failed to get capture")?;
+        Ok(f(capture))
+    })
+}
 
 
 #[tauri::command]
@@ -25,7 +43,7 @@ pub async fn get_block_translate(
 
     let start = Instant::now();
 
-    let (text, clear_boxes) = box_ocr(phys_x, phys_y, phys_w, phys_h, scale);
+    let (text, clear_boxes) = box_ocr(phys_x, phys_y, phys_w, phys_h, scale)?;
 
     let uniq_id = fnv1a_hash(text.as_bytes());
 
@@ -107,12 +125,12 @@ pub async fn get_block_translate(
     Ok((translated_text, translated_boxes))
 }
 
-pub fn box_ocr(phys_x: i32, phys_y: i32, phys_w: i32, phys_h: i32, scale: f32,) -> (String, Vec<OcrWord>) {
-    let mut capture = Capture::new();
-
+pub fn box_ocr(phys_x: i32, phys_y: i32, phys_w: i32, phys_h: i32, scale: f32,) -> Result<(String, Vec<OcrWord>), String> {
     let resources_path = get_resource_dir().join("screenshot");
 
-    let buffer = capture.capture_fragment(phys_x, phys_y, phys_w, phys_h);
+    let buffer = with_capture(|capture| {
+        capture.capture_fragment(phys_x, phys_y, phys_w, phys_h)
+    })?;
 
     let img = preprocess_for_tesseract_sys(
         &buffer,
@@ -129,12 +147,12 @@ pub fn box_ocr(phys_x: i32, phys_y: i32, phys_w: i32, phys_h: i32, scale: f32,) 
         phys_h as u32,
         buffer.clone(),
     ) {
-        let _ = debug_img.save(resources_path.join(format!("debug_{}.png", uniq_id.clone())));
+        let _ = debug_img.save(resources_path.join(format!("debug_{}.png", uniq_id)));
     }
 
     let clear_boxes = postprocess_ocr(boxes);
 
-    (text, clear_boxes)
+    Ok((text, clear_boxes))
 }
 
 #[tauri::command]
