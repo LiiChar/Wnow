@@ -2,8 +2,7 @@ use std::time::Instant;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_log::log::{log, Level};
 use crate::capture::Capture;
-use crate::ocr::recognize_with_boxes;
-use crate::capture::preprocess_for_tesseract_sys;
+use crate::ocr::{preprocess_for_tesseract_sys, recognize_with_boxes};
 use crate::platform::set_window_topmost;
 
 pub async fn show_translate(app: &AppHandle) {

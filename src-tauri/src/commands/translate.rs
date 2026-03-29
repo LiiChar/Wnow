@@ -1,10 +1,12 @@
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use image::{GrayImage, RgbaImage};
 use tauri::{WebviewWindow};
 use tauri_plugin_log::log::{log, Level};
 use crate::capture::Capture;
-use crate::ocr::{recognize_with_boxes, postprocess_ocr, OcrWord};
-use crate::capture::preprocess_for_tesseract_sys;
+use crate::get_resource_dir;
+use crate::ocr::{OcrWord, postprocess_ocr, preprocess_for_rapid_ocr, preprocess_for_tesseract_sys, recognize_with_boxes};
 use crate::translation::translate as t;
+use crate::utils::fnv1a_hash;
 use futures::future::join_all;
 
 
@@ -21,7 +23,15 @@ pub async fn get_block_translate(
     let phys_w = (size.0 as f32 * scale) as i32;
     let phys_h = (size.1 as f32 * scale) as i32;
 
+    let start = Instant::now();
+
     let (text, clear_boxes) = box_ocr(phys_x, phys_y, phys_w, phys_h, scale);
+
+    let uniq_id = fnv1a_hash(text.as_bytes());
+
+
+    log!(Level::Info, "OCR done in {}ms", start.elapsed().as_millis());
+    log!(Level::Info, "OCR boxes: {} - text: {}", clear_boxes.len(), text);
 
     if text.trim().is_empty() && clear_boxes.is_empty() {
         return Ok(("".to_string(), vec![]));
@@ -44,7 +54,6 @@ pub async fn get_block_translate(
 
     let results = join_all(futures).await;
 
-    // 🔥 3. Разбор результатов
     let mut translated_text = text.clone();
     let mut translated_boxes = Vec::with_capacity(clear_boxes.len());
 
@@ -57,6 +66,7 @@ pub async fn get_block_translate(
                     let b = &clear_boxes[i - 1];
 
                     translated_boxes.push(OcrWord {
+                        id: Some(uniq_id.to_string()),
                         x: b.x,
                         y: b.y,
                         w: b.w,
@@ -75,6 +85,7 @@ pub async fn get_block_translate(
                     let b = &clear_boxes[i - 1];
 
                     translated_boxes.push(OcrWord {
+                        id: Some(uniq_id.to_string()),
                         x: b.x,
                         y: b.y,
                         w: b.w,
@@ -99,6 +110,8 @@ pub async fn get_block_translate(
 pub fn box_ocr(phys_x: i32, phys_y: i32, phys_w: i32, phys_h: i32, scale: f32,) -> (String, Vec<OcrWord>) {
     let mut capture = Capture::new();
 
+    let resources_path = get_resource_dir().join("screenshot");
+
     let buffer = capture.capture_fragment(phys_x, phys_y, phys_w, phys_h);
 
     let img = preprocess_for_tesseract_sys(
@@ -109,6 +122,15 @@ pub fn box_ocr(phys_x: i32, phys_y: i32, phys_w: i32, phys_h: i32, scale: f32,) 
     );
 
     let (text, boxes) = recognize_with_boxes(&img, phys_w, phys_h, scale);
+    let uniq_id = fnv1a_hash(text.clone().as_bytes());
+
+    if let Some(debug_img) = RgbaImage::from_raw(
+        phys_w as u32,
+        phys_h as u32,
+        buffer.clone(),
+    ) {
+        let _ = debug_img.save(resources_path.join(format!("debug_{}.png", uniq_id.clone())));
+    }
 
     let clear_boxes = postprocess_ocr(boxes);
 

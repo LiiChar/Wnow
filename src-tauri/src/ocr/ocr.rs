@@ -2,11 +2,13 @@ use image::RgbImage;
 use ocr_rs::{OcrEngine, OcrEngineConfig};
 use serde::Serialize;
 use std::sync::OnceLock;
+use tauri_plugin_log::log::{self, Level, log};
 
-use crate::get_resource_dir;
+use crate::{get_resource_dir, utils::fnv1a_hash};
 
 #[derive(Debug, Serialize, Clone)]
 pub struct OcrWord {
+    pub id: Option<String>,
     pub x: i32,
     pub y: i32,
     pub w: i32,
@@ -23,7 +25,6 @@ fn get_ocr_engine() -> Result<&'static OcrEngine, String> {
     }
 
     let root_path = get_resource_dir();
-
     let models_path = root_path.join("ocr-model");
 
     let det_model = models_path.join("PP-OCRv5_mobile_det_fp16.mnn");
@@ -31,7 +32,7 @@ fn get_ocr_engine() -> Result<&'static OcrEngine, String> {
     let charset = models_path.join("ppocr_keys_cyrillic.txt");
 
     let config = OcrEngineConfig::fast()
-        .with_parallel(true); // 🔥 ключ к скорости
+        .with_parallel(true);
 
     let engine = OcrEngine::new(
         det_model.to_str().unwrap(),
@@ -40,6 +41,8 @@ fn get_ocr_engine() -> Result<&'static OcrEngine, String> {
         Some(config),
     )
     .map_err(|e| format!("Engine error: {}", e))?;
+
+    log!(Level::Info, "OCR engine initialized");
 
     Ok(OCR_ENGINE.get_or_init(|| engine))
 }
@@ -51,8 +54,7 @@ pub fn recognize_with_boxes(
     scale: f32,
 ) -> (String, Vec<OcrWord>) {
 
-    // grayscale → RGB (быстро)
-    let mut rgb = Vec::with_capacity(gray.len() * 3);
+    let mut rgb: Vec<u8> = Vec::with_capacity(gray.len() * 3);
     for &p in gray {
         rgb.extend_from_slice(&[p, p, p]);
     }
@@ -68,7 +70,7 @@ pub fn recognize_with_boxes(
         }
     };
 
-    let results = match engine.recognize(&image::DynamicImage::ImageRgb8(img)) {
+    let results = match engine.recognize(&image::DynamicImage::ImageRgb8(img.clone())) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("OCR error: {}", e);
@@ -76,9 +78,12 @@ pub fn recognize_with_boxes(
         }
     };
 
-    let mut words = Vec::with_capacity(results.len());
-    let mut full_text = String::new();
+    let text = engine.recognize_text(&image::DynamicImage::ImageRgb8(img)).expect("Error by recognize full text");
 
+    
+    let mut words = Vec::with_capacity(results.len());
+
+    let uniq_id = fnv1a_hash(text.text.clone().as_bytes());
     for r in results {
         if r.text.is_empty() {
             continue;
@@ -87,6 +92,7 @@ pub fn recognize_with_boxes(
         let rect = &r.bbox.rect;
 
         words.push(OcrWord {
+            id: Some(uniq_id.to_string()),
             x: (rect.left() as f32 / scale) as i32,
             y: (rect.top() as f32 / scale) as i32,
             w: (rect.width() as f32 / scale) as i32,
@@ -94,10 +100,83 @@ pub fn recognize_with_boxes(
             text: r.text.clone(),
             translation: None,
         });
-
-        full_text.push_str(&r.text);
-        full_text.push(' ');
     }
 
-    (full_text, words)
+    (text.text, words)
 }
+
+// static _OCR_ENGINE: OnceLock<OcrEngineNew> = OnceLock::new();
+
+// pub const DETECTION_MODEL_NAME: &str = "text-detection.rten";
+// pub const RECOGNITION_MODEL_NAME: &str = "text-recognition.rten";
+
+// fn _get_ocr_engine() -> Result<&'static OcrEngineNew, String> {
+//     if let Some(engine) = _OCR_ENGINE.get() {
+//         return Ok(engine);
+//     }
+
+//     let root_path = get_resource_dir();
+//     let models_path = root_path.join("ocr-model").join("ocr-new");
+//     let detection_model = Model::load_file(models_path.join(DETECTION_MODEL_NAME))
+//             .expect("Could not load detection model");
+//     let recognition_model = Model::load_file(models_path.join(RECOGNITION_MODEL_NAME))
+//         .expect("Could not load recognition model");
+
+//     let engine_parames = OcrEngineParams {
+//         detection_model: Some(detection_model),
+//         recognition_model: Some(recognition_model),
+//         ..Default::default()
+//     };
+
+//     let engine = OcrEngineNew::new(engine_parames).expect("Coult not init ocr engine");
+
+    
+//     return Ok(_OCR_ENGINE.get_or_init(|| engine));
+// }
+
+// pub fn _recognize_with_boxes(
+//     gray: &[u8],
+//     width: i32,
+//     height: i32,
+//     x: i32,
+//     y: i32,
+//     scale: f32,
+// ) -> (String, Vec<OcrWord>) {
+//     let engine = _get_ocr_engine().unwrap();
+//     let img_source =
+//         ImageSource::from_bytes(gray, (width as u32, height as u32)).unwrap();
+
+//     let ocr_input = engine
+//         .prepare_input(img_source)
+//         .expect("Could not prepare input for OCR");
+
+//     let world_rects = engine.detect_words(&ocr_input).unwrap();
+//     let line_rects = engine.find_text_lines(&ocr_input, &world_rects);
+//     let line_texts = engine
+//         .recognize_text(&ocr_input, &line_rects)
+//         .expect("Could not recognize text");
+
+//     let mut text_buffer = String::from("");
+    
+//     for line in line_texts
+//         .iter()
+//         .flatten()
+//         .filter(|l| l.to_string().len() > 1)
+//     {
+//         text_buffer.push_str(format!("{}\n", line).as_str());
+//     }
+
+//     let uniq_id = fnv1a_hash(text_buffer.clone().as_bytes());
+
+//     let boxes = vec![OcrWord {
+//         id: Some(uniq_id.to_string()),
+//         h: (height as f32 / scale) as i32,
+//         w: (width as f32 / scale) as i32,
+//         x: (0 as f32 / scale) as i32,
+//         y: (0 as f32 / scale) as i32,
+//         text: text_buffer.clone(),
+//         translation: None,
+//     }];
+
+//     (text_buffer, boxes)
+// }

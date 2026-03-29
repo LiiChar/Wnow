@@ -2,6 +2,9 @@ use std::{fs::File, io::BufWriter, path::Path};
 
 use chrono::Local;
 use image::{GrayImage, ImageBuffer, Luma};
+use tauri::utils::resources;
+
+use crate::get_resource_dir;
 
 pub fn save_grayimage_image(
     img: &GrayImage,
@@ -63,8 +66,10 @@ pub fn save_image(
         image::ImageFormat::Bmp => "bmp",
         image::ImageFormat::Tiff => "tiff",
         image::ImageFormat::Gif => "gif",
-        _ => "img", // на всякий случай
+        _ => "img",
     };
+
+    let resources_path = get_resource_dir();
 
     let file_path = if let Some(name) = name {
         // path — это папка, name — имя файла

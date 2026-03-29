@@ -1,14 +1,13 @@
 
 use std::collections::HashMap;
-use std::path::PathBuf;
 
 use std::sync::{Arc, Mutex};
 
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
 use ct2rs::{ComputeType, Config as Ct2rsConfig, Device, TranslationOptions};
 use ct2rs::tokenizers::auto::Tokenizer as AutoTokenizer;
 use ct2rs::Translator;
+use tauri_plugin_log::log::{log, Level};
 
 use crate::get_resource_dir;
 
@@ -153,6 +152,8 @@ pub fn translate_local_translator(
 
             let translator = AutoCt2rsTranslator::new(&model_path, &config)
                 .map_err(|e| e.to_string())?;
+        
+            log!(Level::Info, "Loaded translator for {}", model_id);
 
             map.insert(model_id.to_string(), Arc::new(translator));
         }

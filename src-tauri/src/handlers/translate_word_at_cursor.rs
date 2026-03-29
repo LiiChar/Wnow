@@ -2,12 +2,11 @@ use std::time::Instant;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_log::log::{log, Level};
 use crate::capture::Capture;
-use crate::ocr::{recognize_with_boxes, OcrWord};
-use crate::capture::preprocess_for_tesseract_sys;
+use crate::ocr::{OcrWord, preprocess_for_tesseract_sys, recognize_with_boxes};
 use crate::translation::translate;
 use crate::platform::set_window_topmost;
 use crate::mouse::Mouse;
-use crate::WordTranslation;
+use crate::utils::fnv1a_hash;
 
 /// Перевод слова под курсором
 pub async fn translate_word_at_cursor(app: &AppHandle) {
@@ -138,7 +137,9 @@ pub async fn translate_word_at_cursor(app: &AppHandle) {
 
     if boxes.is_empty() {
         log!(Level::Info, "No text found in capture area");
+        
         let result = OcrWord {
+            id: None,
             text: String::new(),
             translation: Some("Текст не найден".to_string()),
             x: logical_mouse_x - 20,
@@ -180,7 +181,10 @@ pub async fn translate_word_at_cursor(app: &AppHandle) {
         let abs_word_x = capture_x_logical + word_box.x;
         let abs_word_y = capture_y_logical + word_box.y;
 
+        let uniq_id = fnv1a_hash(word_text.as_bytes());
+
         let result = vec![OcrWord {
+            id: Some(uniq_id.to_string()),
             text: word_text,
             translation: Some(translation),
             x: abs_word_x,

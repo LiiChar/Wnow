@@ -10,42 +10,14 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [
-      {
-        "label": "overlay",
-        "title": "Wnow Translator",
-        "url": "/",
-        "width": 1280,
-        "height": 720,
-        "transparent": true,
-        "decorations": false,
-        "maximized": true,
-        "alwaysOnTop": true,
-        "skipTaskbar": true,
-        "visible": true,
-        "focus": false,
-        "acceptFirstMouse": true,
-        "shadow": false,
-        "resizable": false
-      },
-      {
-        "label": "main",
-        "title": "Wnow",
-        "url": "/",
-        "width": 364,
-        "height": 530,
-        "minWidth": 380,
-        "minHeight": 500,
-        "transparent": false,
-        "decorations": false,
-        "maximized": false,
-        "alwaysOnTop": false,
-        "center": true,
-        "visible": true
-      }
-    ],
     "security": {
-      "csp": null
+      "assetProtocol": {
+        "scope": {
+          "allow": ["**/resources/**"]
+        },
+        "enable": true
+      },
+      "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost blob: data:; media-src 'self' asset: http://asset.localhost blob:; script-src 'unsafe-inline' 'self' asset: http://asset.localhost blob:; style-src 'unsafe-inline' 'self' asset: http://asset.localhost blob:"
     }
   },
   "bundle": {

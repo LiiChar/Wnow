@@ -1,4 +1,5 @@
 export type TextBox = {
+	id?: string;
 	text: string;
 	translation?: string;
 	context?: string;

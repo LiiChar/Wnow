@@ -10,9 +10,9 @@ export const Header = () => {
 
   const handleCloseApp = async () => {
     try {
-      await  getCurrentWebviewWindow().hide();
+      getCurrentWebviewWindow().close();
     } catch (e) {
-      console.error('Failed to hide window:', e);
+      console.error('Failed to close window:', e);
     }
   };
 

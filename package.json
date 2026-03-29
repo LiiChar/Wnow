@@ -24,6 +24,7 @@
     "@tauri-apps/plugin-store": "~2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "fitty": "^2.4.2",
     "lucide-solid": "^1.0.0-rc.1",
     "pino": "^10.3.1",
     "pino-pretty": "^13.1.3",

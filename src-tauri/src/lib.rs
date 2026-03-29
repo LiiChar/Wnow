@@ -10,8 +10,8 @@ mod source;
 mod storage;
 mod translation;
 mod utils;
+mod windows;
 
-use serde::Serialize;
 use tauri::Manager;
 use tauri::Emitter;
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutState};
@@ -19,34 +19,21 @@ use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutState};
 pub use handlers::{show_translate, translate_word_at_cursor, translate_selected_text};
 pub use platform::set_window_topmost;
 pub use utils::{init_resource_dir, get_resource_dir};
+pub use windows::windows::create_main_window;
 
 use crate::commands::common::start_global_mouse_stream;
 use crate::setup::register_shortcut_handler;
+use crate::windows::windows::create_overlay_window;
 
-/// Данные для popup с переводом слова
-#[derive(Debug, Clone, Serialize)]
-pub struct WordTranslation {
-    pub word: String,
-    pub translation: String,
-    pub context: String,
-    pub context_translation: String,
-    // Позиция popup
-    pub popup_x: i32,
-    pub popup_y: i32,
-    // Позиция и размер слова на экране (для обводки)
-    pub word_x: i32,
-    pub word_y: i32,
-    pub word_w: i32,
-    pub word_h: i32,
-}
+
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let ctrl_t = Shortcut::new(Some(Modifiers::CONTROL), Code::KeyT);
     let ctrl_y = Shortcut::new(Some(Modifiers::CONTROL), Code::KeyY);
     let ctrl_u = Shortcut::new(Some(Modifiers::CONTROL), Code::KeyU);
+    let ctrl_i = Shortcut::new(Some(Modifiers::CONTROL), Code::KeyI);
     let ctrl_shift_c = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyC);
-    let esc = Shortcut::new(Some(Modifiers::all()), Code::Escape);
 
     tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -57,8 +44,6 @@ pub fn run() {
                     if shortcut == &ctrl_y {
                         match event.state() {
                             ShortcutState::Released => {
-                                println!("translate_fragment");
-                                // Делаем overlay интерактивным и поверх всех окон
                                 if let Some(overlay) = app.get_webview_window("overlay") {
                                     overlay.set_ignore_cursor_events(false).ok();
                                     overlay.set_focus().ok();
@@ -106,13 +91,10 @@ pub fn run() {
                             _ => {}
                         }
                     }
-                    if shortcut == &esc {
+                    if shortcut == &ctrl_i {
                         match event.state() {
                             ShortcutState::Released => {
-                                app.emit_to("overlay", "close_popup", ()).ok();
-                                if let Some(w) = app.get_webview_window("overlay") {
-                                    w.set_ignore_cursor_events(true).ok();
-                                }
+                                app.emit_to("overlay", "close_translate", ()).ok();
                             }
                             _ => {}
                         }
@@ -159,7 +141,8 @@ pub fn run() {
             setup::setup_tray(&app.handle())?;
 
             // start_global_mouse_stream(window);
-
+            create_main_window(&app.handle())?;
+            create_overlay_window(&app.handle())?;
             Ok(())
         })
         .run(tauri::generate_context!())

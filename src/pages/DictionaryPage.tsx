@@ -67,12 +67,13 @@ export function DictionaryPage() {
 
   return (
 		<div class='h-full flex flex-col gap-2 '>
-			<Translate/>
+			<Translate />
 
 			<Input
 				placeholder='Поиск...'
 				value={search()}
 				onInput={e => setSearch(e.currentTarget.value)}
+				class='h-10! max-h-max'
 			/>
 
 			<div class='flex-1'>
@@ -107,7 +108,10 @@ export function DictionaryPage() {
 									return (
 										<Card
 											class='cursor-pointer transition-colors'
-											onClick={() => {setSelectedWord(word); setOpen(true);}}
+											onClick={() => {
+												setSelectedWord(word);
+												setOpen(true);
+											}}
 										>
 											<CardContent>
 												<div class='flex items-center justify-between '>
@@ -128,7 +132,7 @@ export function DictionaryPage() {
 					</Show>
 				</Show>
 			</div>
-			<BottomPadding/>
+			<BottomPadding />
 
 			<Dialog
 				open={open()}
@@ -170,6 +174,9 @@ export function DictionaryPage() {
 							</div>
 							<div class='text-xs text-neutral-500'>Уровень</div>
 						</div>
+						<Show when={selectedWord()?.screenshot_path}>
+							{path => <img src={path()} alt='' />}
+						</Show>
 					</div>
 					<DialogFooter>
 						<Alert

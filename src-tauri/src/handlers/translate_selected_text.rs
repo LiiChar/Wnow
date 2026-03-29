@@ -8,7 +8,7 @@ use crate::mouse::Mouse;
 use crate::ocr::OcrWord;
 use crate::platform::set_window_topmost;
 use crate::translation::translate;
-use crate::WordTranslation;
+use crate::utils::fnv1a_hash;
 
 /// Перевод выделенного текста (без изменения буфера обмена пользователя)
 pub async fn translate_selected_text(app: &AppHandle) {
@@ -69,6 +69,8 @@ pub async fn translate_selected_text(app: &AppHandle) {
         return;
     }
 
+    let uniq_id = fnv1a_hash(text.as_bytes());
+
     log!(Level::Info, "Translating selected text: '{}'", &text[..text.len().min(50)]);
 
     // 6. Переводим текст
@@ -88,6 +90,7 @@ pub async fn translate_selected_text(app: &AppHandle) {
     let logical_y = (phys_y as f32 / scale) as i32;
 
     let result = vec![OcrWord {
+        id: Some(uniq_id.to_string()),
         text: text.to_string(),
         translation: Some(translation),
         x: logical_x,

@@ -33,7 +33,12 @@ export const BoxElement = (props: BoxElementProps) => {
 
 	const handleAddToStudy = async () => {
 		try {
-			addWordToStudy(props.box.text, props.box.translation ?? props.box.text);
+			addWordToStudy(
+				props.box.text,
+				props.box.translation ?? props.box.text,
+				props.box
+					.id ? `http://asset.localhost/resources/screenshots/debug_${props.box.id}.png` : null,
+			);
 		} catch (e) {
 			console.error('Failed to add word:', e);
 			toaster.show(props => (

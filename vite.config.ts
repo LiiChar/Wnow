@@ -15,6 +15,15 @@ export default defineConfig(async () => ({
 		},
 	},
 
+	build: {
+			rollupOptions: {
+					input: {
+							overlay: "overlay.html",
+							index: "index.html"
+					}
+			}
+	},
+
 	// Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
 	//
 	// 1. prevent Vite from obscuring rust errors
@@ -27,7 +36,7 @@ export default defineConfig(async () => ({
 		hmr: host
 			? {
 					protocol: 'ws',
-					host,
+					host,	
 					port: 1421,
 				}
 			: undefined,

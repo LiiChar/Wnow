@@ -1,15 +1,19 @@
 import { invoke } from "@tauri-apps/api/core";
 import { FlashcardWord, LearningStats, SavedWord } from "../types/storage";
 
-export const addWordToStudy = async (text: string, translation: string) => {
-  await invoke('add_word_to_study', {
+export const addWordToStudy = async (
+	text: string,
+	translation: string,
+	screenshotPath: string | null,
+) => {
+	await invoke('add_word_to_study', {
 		word: text,
 		translation: translation,
 		context: '',
 		contextTranslation: '',
-		screenshotBase64: null,
+		screenshotPath: null,
 	});
-}
+};
 
 export const getAllWords = async () => {
   return await invoke<SavedWord[]>('get_all_words');

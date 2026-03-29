@@ -85,12 +85,12 @@ export const Translate = () => {
 
   return (
 		<div class='flex h-full w-full flex-col bg-background border border-border rounded-lg overflow-hidden min-h-38.5'>
-			<div class='flex items-center justify-between px-1 py-1 pb-1'>
+			<div class='flex items-center justify-between pb-1'>
 				<div class='flex justify-between items-center w-full gap-2'>
 					<select
 						value={sourceLang()}
 						onInput={e => setSourceLang(e.currentTarget.value)}
-						class='cursor-pointer rounded-md max-w-[calc(50%-24px)] border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary'
+						class='cursor-pointer  max-w-[calc(50%-24px)] border-b border-r rounded-br-md border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary'
 					>
 						{languages.map(lang => (
 							<option value={lang.code}>{lang.name}</option>
@@ -109,7 +109,7 @@ export const Translate = () => {
 					<select
 						value={targetLang()}
 						onInput={e => setTargetLang(e.currentTarget.value)}
-						class='cursor-pointer rounded-md border max-w-[calc(50%-24px)] border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary'
+						class='cursor-pointer border-b border-l rounded-bl-md max-w-[calc(50%-24px)] border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary'
 					>
 						{languages.map(lang => (
 							<option value={lang.code}>{lang.name}</option>
@@ -126,7 +126,7 @@ export const Translate = () => {
 						value={sourceText()}
 						onInput={e => setSourceText(e.currentTarget.value)}
 						placeholder='Введите текст для перевода...'
-						class='flex-1 resize-none border-none bg-background p-2 pr-7 text-base leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/70'
+						class='flex-1 resize-none border-none bg-background p-2 pr-7 text-base leading-relaxed text-foreground outline-none'
 						spellcheck='false'
 					/>
 
@@ -158,9 +158,10 @@ export const Translate = () => {
 							variant='ghost'
 							size='sm'
 							onClick={async () => {
-								await addWordToStudy(sourceText(), translatedText());
-								setAdded(true);
-								setTimeout(() => setAdded(false), 2000);
+								await navigator.mediaDevices.getUserMedia({
+									audio: true,
+								});
+								start();
 							}}
 							disabled={!supported}
 							class={cn(
@@ -225,15 +226,19 @@ export const Translate = () => {
 						</Button>
 						<Button
 							variant='ghost'
-							size='sm'
+							size='sm' 
 							onClick={async () => {
-								await navigator.mediaDevices.getUserMedia({ audio: true });
-								start();
+								await addWordToStudy(
+									sourceText(),
+									translatedText(),
+									null,
+								);
+								setAdded(true);
+								setTimeout(() => setAdded(false), 2000);
 							}}
 							disabled={!sourceText()}
 							class={cn(
 								'h-7 w-7 p-0 hover:bg-accent',
-								listening() && 'bg-accent',
 							)}
 						>
 							<Show when={isAdded()} fallback={<Plus class='h-3.5 w-3.5' />}>

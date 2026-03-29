@@ -10,30 +10,9 @@ pub async fn add_word_to_study(
     translation: String,
     context: String,
     context_translation: String,
-    screenshot_base64: Option<String>,
+    screenshot_path: Option<String>,
     app: tauri::AppHandle,
 ) -> Result<i64, String> {
-    // Сохраняем скриншот если есть
-    let screenshot_path = if let Some(base64_data) = screenshot_base64 {
-        let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-        let screenshots_dir = app_data_dir.join("screenshots");
-        std::fs::create_dir_all(&screenshots_dir).ok();
-
-        let filename = format!("{}.png", chrono::Utc::now().timestamp_millis());
-        let path = screenshots_dir.join(&filename);
-
-        if let Ok(data) =
-            base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &base64_data)
-        {
-            std::fs::write(&path, data).ok();
-            Some(path.to_string_lossy().to_string())
-        } else {
-            None
-        }
-    } else {
-        None
-    };
-
     Database::add_word(
         &word,
         &translation,

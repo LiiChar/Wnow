@@ -1,5 +1,5 @@
 export const BottomPadding = () => {
   return (
-    <div class='pb-16 w-full '></div>
+    <div class='pb-18 w-full '></div>
   );
 };

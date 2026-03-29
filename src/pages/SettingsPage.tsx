@@ -86,7 +86,7 @@ export function SettingsPage() {
 	};
 
 	return (
-		<div class='h-full flex flex-col gap-2 overflow-y-auto'>
+		<div class='h-full flex flex-col gap-2'>
 			{/* Запуск приложения */}
 			<Card>
 				<CardHeader class=''>

@@ -2,84 +2,24 @@ use strsim::levenshtein;
 
 use crate::ocr::OcrWord;
 
-/* =========================
-НАСТРОЙКИ
-========================= */
-
 const LINE_Y_THRESHOLD: i32 = 10;
+const MAX_WORD_GAP: i32 = 20;
 const MAX_LEV_DISTANCE: usize = 2;
 
-const VOWELS_RU: &str = "аеёиоуыэюя";
-
-const VOWELS_EN: &str = "aeiouy";
-
-/* Минимальный словарь.
-⚠️ В реальном проекте лучше грузить из файла */
 static DICTIONARY: &[&str] = &[
-    "привет",
-    "пока",
-    "сообщение",
-    "приват",
-    "настройки",
-    "файл",
-    "отмена",
-    "сохранить",
-    "вход",
-    "выход",
-    "ошибка",
+    "привет", "пока", "сообщение", "приват", "настройки",
+    "файл", "отмена", "сохранить", "вход", "выход", "ошибка",
 ];
-
-/* =========================
-БАЗОВЫЕ ФИЛЬТРЫ
-========================= */
 
 fn looks_like_word(s: &str) -> bool {
     let s = s.trim();
-
     if s.len() < 2 {
         return false;
     }
 
     let letters = s.chars().filter(|c| c.is_alphabetic()).count();
-    let digits = s.chars().filter(|c| c.is_numeric()).count();
-
-    if digits > 0 {
-        return false;
-    }
-
-    if letters * 100 / s.len() < 70 {
-        return false;
-    }
-
-    true
+    letters * 100 / s.len() > 60
 }
-
-fn has_vowels(s: &str) -> bool {
-    s.chars().any(|c| {
-        c.to_lowercase()
-            .next()
-            .map(|c| VOWELS_EN.contains(c))
-            .unwrap_or(false)
-    })
-}
-
-fn is_suspicious(word: &str) -> bool {
-    let vowels = word
-        .chars()
-        .filter(|c| {
-            c.to_lowercase()
-                .next()
-                .map(|c| VOWELS_RU.contains(c))
-                .unwrap_or(false)
-        })
-        .count();
-
-    vowels == 0 || vowels * 2 < word.len()
-}
-
-/* =========================
-ИСПРАВЛЕНИЕ СЛОВ
-========================= */
 
 fn correct_word(word: &str) -> Option<String> {
     let w = word.to_lowercase();
@@ -100,20 +40,10 @@ fn correct_word(word: &str) -> Option<String> {
     best.map(|(w, _)| w.to_string())
 }
 
-/* =========================
-ГРУППИРОВКА В СТРОКИ
-========================= */
-
-fn group_words_into_lines(words: &[OcrWord]) -> Vec<Vec<OcrWord>> {
+fn group_lines(words: &[OcrWord]) -> Vec<Vec<OcrWord>> {
     let mut words = words.to_vec();
 
-    words.sort_by(|a, b| {
-        if (a.y - b.y).abs() < LINE_Y_THRESHOLD {
-            a.x.cmp(&b.x)
-        } else {
-            a.y.cmp(&b.y)
-        }
-    });
+    words.sort_by_key(|w| (w.y, w.x));
 
     let mut lines: Vec<Vec<OcrWord>> = Vec::new();
 
@@ -126,54 +56,147 @@ fn group_words_into_lines(words: &[OcrWord]) -> Vec<Vec<OcrWord>> {
                 continue;
             }
         }
+
         lines.push(vec![w]);
+    }
+
+    // сортируем внутри строки
+    for line in &mut lines {
+        line.sort_by_key(|w| w.x);
     }
 
     lines
 }
 
-/* =========================
-КОНТЕКСТНОЕ ИСПРАВЛЕНИЕ
-========================= */
+fn can_merge(a: &OcrWord, b: &OcrWord) -> bool {
+    let a_right = a.x + a.w;
+    let gap = b.x - a_right;
 
-fn correct_line_context(words: &[OcrWord]) -> Vec<OcrWord> {
-    let mut out = Vec::with_capacity(words.len());
+    gap >= 0 && gap <= MAX_WORD_GAP
+}
 
-    for w in words {
-        let raw = w.text.trim();
+fn try_merge_sequence(words: &[OcrWord]) -> Option<OcrWord> {
+    let text = words.iter().map(|w| w.text.as_str()).collect::<String>();
 
-        if !looks_like_word(raw) || !has_vowels(raw) {
-            continue;
-        }
+    if let Some(corrected) = correct_word(&text) {
+        let first = words.first()?;
+        let last = words.last()?;
 
-        // let text = if is_suspicious(raw) {
-        //     correct_word(raw).unwrap_or_else(|| raw.to_string())
-        // } else {
-        //     raw.to_string()
-        // };
-
-        out.push(OcrWord {
-            text: raw.to_string(),
-            ..w.clone()
+        return Some(OcrWord {
+            id: None,
+            text: corrected,
+            x: first.x,
+            y: first.y,
+            w: (last.x + last.w) - first.x,
+            h: first.h,
+            translation: None,
         });
     }
 
-    out
+    None
 }
 
-/* =========================
-ПУБЛИЧНЫЙ API
-========================= */
-
-pub fn postprocess_ocr(words: Vec<OcrWord>) -> Vec<OcrWord> {
-    let lines = group_words_into_lines(&words);
-
+fn merge_words(line: &[OcrWord]) -> Vec<OcrWord> {
     let mut result = Vec::new();
+    let mut i = 0;
 
-    for line in lines {
-        let fixed = correct_line_context(&line);
-        result.extend(fixed);
+    while i < line.len() {
+        let mut merged = None;
+
+        // пробуем 3 слова
+        if i + 2 < line.len()
+            && can_merge(&line[i], &line[i + 1])
+            && can_merge(&line[i + 1], &line[i + 2])
+        {
+            merged = try_merge_sequence(&line[i..=i + 2]);
+            if merged.is_some() {
+                result.push(merged.unwrap());
+                i += 3;
+                continue;
+            }
+        }
+
+        // пробуем 2 слова
+        if i + 1 < line.len() && can_merge(&line[i], &line[i + 1]) {
+            merged = try_merge_sequence(&line[i..=i + 1]);
+            if merged.is_some() {
+                result.push(merged.unwrap());
+                i += 2;
+                continue;
+            }
+        }
+
+        result.push(line[i].clone());
+        i += 1;
     }
 
     result
+}
+
+fn process_line(words: &[OcrWord]) -> Vec<OcrWord> {
+    let merged = merge_words(words);
+
+    merged
+        .into_iter()
+        .map(|mut w| {
+            let raw = w.text.trim().to_string();
+
+            if looks_like_word(&raw) {
+                if let Some(corrected) = correct_word(&raw) {
+                    w.text = corrected;
+                } else {
+                    w.text = raw;
+                }
+            }
+
+            w
+        })
+        .collect()
+}
+
+fn build_sentences(lines: Vec<Vec<OcrWord>>) -> Vec<OcrWord> {
+    let mut result = Vec::new();
+
+    for line in lines {
+        if line.is_empty() {
+            continue;
+        }
+
+        let mut text = String::new();
+
+        for (i, w) in line.iter().enumerate() {
+            if i > 0 {
+                text.push(' ');
+            }
+            text.push_str(&w.text);
+        }
+
+        let first = &line[0];
+        let last = &line[line.len() - 1];
+
+        result.push(OcrWord {
+            id: None,
+            text,
+            x: first.x,
+            y: first.y,
+            w: (last.x + last.w) - first.x,
+            h: first.h,
+            translation: None,
+        });
+    }
+
+    result
+}
+
+pub fn postprocess_ocr(words: Vec<OcrWord>) -> Vec<OcrWord> {
+    let lines = group_lines(&words);
+
+    let mut processed_lines = Vec::new();
+
+    for line in lines {
+        let fixed = process_line(&line);
+        processed_lines.push(fixed);
+    }
+
+    build_sentences(processed_lines)
 }

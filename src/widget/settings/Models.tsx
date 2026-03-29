@@ -4,9 +4,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { downloadModel, getAvailableModels, getModelList } from "@/shared/api/model";
 import { languages } from "@/shared/lib/language";
 import { toaster } from "@kobalte/core/toast";
-import { createSignal, For, onMount } from "solid-js";
+import { createMemo, createSignal, For, onMount } from "solid-js";
 import { listen } from '@tauri-apps/api/event';
 import { log } from "@/shared/lib/log";
+import { Input } from "@/components/ui/Input";
 
 const getLangFromModelId = (modelId: string) => {
   const lang = modelId.replace("gaudi/opus-mt-", "").replace("-ctranslate2", "");
@@ -67,6 +68,29 @@ export const Models = () => {
 			});
     });
   });
+
+	const [query, setQuery] = createSignal('');
+	const filteredModles = createMemo(() => {
+		return availableModels()
+			.filter(name => {
+				return formatedModelName(name)
+					.replace('→ ', '')
+					.toLowerCase()
+					.includes(query().toLowerCase());
+			})
+			.sort((a, b) => {
+				const aIncluded = models().includes(getLangFromModelId(a));
+				const bIncluded = models().includes(getLangFromModelId(b));
+
+				// сначала те, что входят в models()
+				if (aIncluded && !bIncluded) return -1;
+				if (!aIncluded && bIncluded) return 1;
+
+				// если оба одинаковые — можно дополнительно отсортировать по имени
+				return formatedModelName(a).localeCompare(formatedModelName(b));
+			});
+	});
+
   return (
 		<Card>
 			<CardHeader>
@@ -76,34 +100,32 @@ export const Models = () => {
 				</CardDescription>
 			</CardHeader>
 			<CardContent>
+				<Input
+					value={query()}
+					onInput={e => setQuery(e.currentTarget.value)}
+					placeholder='Поиск...'
+					class="mb-2 bg-transparent!"
+				/>
 				<div class='flex flex-col gap-2 max-h-62 overflow-auto '>
-					<For
-						each={availableModels().filter(
-							m => models().includes(getLangFromModelId(m)),
-						)}
-					>
-						{model => {
-							return (
-                <ModelElement
-                  isDownloaded={true}
-									title={formatedModelName(model)}
-								/>
-							);
-						}}
-					</For>
-					<For
-						each={availableModels().filter(
-							m => !models().includes(getLangFromModelId(m)),
-						)}
-					>
+		
+					<For each={filteredModles()}>
 						{model => {
 							return (
 								<ModelElement
-                  isDownloaded={false}
-                  isDownloading={downloadingModels().find(m => m.id === model) !== undefined}
-                  downloadProgress={+(downloadingModels().find(m => m.id === model)?.progress ?? 0).toFixed(2)}
+									isDownloaded={models().includes(getLangFromModelId(model))}
+									isDownloading={
+										downloadingModels().find(m => m.id === model) !== undefined
+									}
+									downloadProgress={
+										+(
+											downloadingModels().find(m => m.id === model)?.progress ??
+											0
+										).toFixed(2)
+									}
 									title={formatedModelName(model)}
 									onClick={async () => {
+										if (models().includes(model)) return;
+
 										await downloadModel(model);
 										toaster.show(props => (
 											<ToastStatus
