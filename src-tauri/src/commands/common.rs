@@ -1,9 +1,8 @@
 use crate::mouse::Mouse;
 use crate::translation::translate;
 use rdev::{listen, Event, EventType};
-use tauri::{WebviewWindow, Emitter};
 use serde::Serialize;
-
+use tauri::{Emitter, WebviewWindow};
 
 #[tauri::command]
 pub fn set_clickthrough(enabled: bool) {
@@ -34,9 +33,11 @@ pub fn log(message: String) {
     println!("{}", message);
 }
 
-
 #[derive(Serialize, Clone)]
-struct MousePos { x: f64, y: f64 }
+struct MousePos {
+    x: f64,
+    y: f64,
+}
 
 pub fn start_global_mouse_stream(window: WebviewWindow) {
     std::thread::spawn(move || {

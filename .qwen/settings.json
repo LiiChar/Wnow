@@ -5,7 +5,9 @@
       "Bash(npx *)",
       "Bash(yarn *)",
       "Bash(npm run *)",
-      "Bash(cargo check)"
+      "Bash(cargo check)",
+      "Bash(mkdir *)",
+      "Bash(select-string *)"
     ]
   },
   "$version": 3

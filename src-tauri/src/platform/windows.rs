@@ -4,9 +4,8 @@ use tauri::WebviewWindow;
 
 pub fn set_window_topmost(window: &WebviewWindow) {
     use winapi::um::winuser::{
-        SetWindowPos, SetWindowLongW, GetWindowLongW,
-        HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SWP_FRAMECHANGED,
-        GWL_EXSTYLE, WS_EX_TOPMOST, WS_EX_TOOLWINDOW,
+        GetWindowLongW, SetWindowLongW, SetWindowPos, GWL_EXSTYLE, HWND_TOPMOST, SWP_FRAMECHANGED,
+        SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
     };
 
     if let Ok(hwnd) = window.hwnd() {
@@ -23,7 +22,10 @@ pub fn set_window_topmost(window: &WebviewWindow) {
             SetWindowPos(
                 hwnd_ptr,
                 HWND_TOPMOST,
-                0, 0, 0, 0,
+                0,
+                0,
+                0,
+                0,
                 SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW | SWP_FRAMECHANGED,
             );
         }
@@ -32,10 +34,7 @@ pub fn set_window_topmost(window: &WebviewWindow) {
 
 /// Скрывает системную кнопку закрытия для прозрачного WebView2 на Windows
 pub fn hide_webview_close_button(window: &WebviewWindow) {
-    use winapi::um::winuser::{
-        SetWindowLongW, GetWindowLongW,
-        GWL_STYLE, WS_SYSMENU,
-    };
+    use winapi::um::winuser::{GetWindowLongW, SetWindowLongW, GWL_STYLE, WS_SYSMENU};
 
     if let Ok(hwnd) = window.hwnd() {
         let hwnd_ptr = hwnd.0 as *mut _;

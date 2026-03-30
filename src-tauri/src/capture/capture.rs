@@ -3,8 +3,6 @@ pub struct Capture {
     capturer: Capturer,
 }
 
-
-
 impl Capture {
     pub fn new() -> Self {
         let display = Display::primary().expect("Couldn't find primary display.");

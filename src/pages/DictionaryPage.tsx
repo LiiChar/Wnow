@@ -12,6 +12,7 @@ import { Alert } from '@/components/dialog/Alert';
 import { BottomPadding } from '@/components/layout/BottomPadding';
 import { Translate } from '@/widget/translate/Translate';
 import { getAllWords } from '@/shared/api/stude';
+import { showNotification } from '@/shared/api/notification';
 
 export function DictionaryPage() {
   const [words, setWords] = createSignal<SavedWord[]>([]);
@@ -68,7 +69,15 @@ export function DictionaryPage() {
   return (
 		<div class='h-full flex flex-col gap-2 '>
 			<Translate />
-
+			<Button onClick={async () => {
+				await showNotification({
+					title: 'Уведомление',
+					text: 'Это уведомление',
+					duration: 2000,
+				})
+			}}>
+				Уведомления
+			</Button>
 			<Input
 				placeholder='Поиск...'
 				value={search()}

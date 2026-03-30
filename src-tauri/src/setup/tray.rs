@@ -1,5 +1,5 @@
-use tauri::{AppHandle, Emitter, Manager};
 use crate::platform::set_window_topmost;
+use tauri::{AppHandle, Emitter, Manager};
 
 /// Настройка системного трея
 pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
@@ -88,6 +88,6 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
             }
         })
         .build(app)?;
-    
+
     Ok(())
 }

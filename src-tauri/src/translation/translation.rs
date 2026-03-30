@@ -1,16 +1,16 @@
-use std::time::{Duration, Instant};
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use reqwest::StatusCode;
+use std::time::{Duration, Instant};
+use tauri_plugin_log::log::{log, Level};
 use thiserror::Error;
 use tokio::time::sleep;
-use tauri_plugin_log::log::{log, Level};
 
 use super::local;
 
 const CACHE_TTL: Duration = Duration::from_secs(60 * 60 * 24);
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(10); 
-const MAX_BATCH_SIZE: usize = 10; 
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
+const MAX_BATCH_SIZE: usize = 10;
 const MAX_RETRIES: usize = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,9 +21,8 @@ pub enum TranslationMode {
 }
 
 /// Текущий режим перевода
-static TRANSLATION_MODE: Lazy<std::sync::Mutex<TranslationMode>> = 
+static TRANSLATION_MODE: Lazy<std::sync::Mutex<TranslationMode>> =
     Lazy::new(|| std::sync::Mutex::new(TranslationMode::OnlineFirst));
-
 
 static HTTP_CLIENT: Lazy<reqwest::Client> = Lazy::new(|| {
     reqwest::Client::builder()
@@ -62,14 +61,13 @@ pub fn set_translation_mode(mode: TranslationMode) {
 }
 
 pub fn get_translation_mode() -> TranslationMode {
-    TRANSLATION_MODE.lock().map(|m| *m).unwrap_or(TranslationMode::OnlineFirst)
+    TRANSLATION_MODE
+        .lock()
+        .map(|m| *m)
+        .unwrap_or(TranslationMode::OnlineFirst)
 }
 
-pub async fn translate(
-    text: String,
-    from: &str,
-    to: &str,
-) -> Result<String, TranslateError> {
+pub async fn translate(text: String, from: &str, to: &str) -> Result<String, TranslateError> {
     let text_lower = text.to_lowercase();
     let text_trimmed = text_lower.trim();
 
@@ -103,12 +101,11 @@ pub async fn translate(
         }
     }
 
-
     // if mode == TranslationMode::OnlineFirst || mode == TranslationMode::OfflineOnly {
     //     if let Ok(translated) = local::translate_local_translator(&text, from, to) {
     //         if !translated.is_empty() {
     //             cache_result(&cache_key, translated.clone());
-                
+
     //             return Ok(translated);
     //         }
     //     } else {
@@ -126,7 +123,11 @@ pub async fn translate(
     Ok(format!("[{}]", text))
 }
 
-pub async fn translate_batch(sentences: Vec<String>, from: &str, to: &str) -> Result<Vec<String>, TranslateError> {
+pub async fn translate_batch(
+    sentences: Vec<String>,
+    from: &str,
+    to: &str,
+) -> Result<Vec<String>, TranslateError> {
     let mut results = Vec::with_capacity(sentences.len());
 
     // Сначала проверяем кэш и словари
@@ -236,13 +237,16 @@ fn normalize_lang(lang: &str) -> &str {
     }
 }
 
-pub async fn online_translate(text: String, from: &str, to: &str) -> Result<String, TranslateError> {
+pub async fn online_translate(
+    text: String,
+    from: &str,
+    to: &str,
+) -> Result<String, TranslateError> {
     let from = normalize_lang(from);
     let to = normalize_lang(to);
 
     // 🔥 retry loop
     for attempt in 0..=MAX_RETRIES {
-        
         if let Ok(res) = translate_google(&text, from, to).await {
             if !res.is_empty() {
                 return Ok(res);
@@ -267,7 +271,6 @@ pub async fn online_translate(text: String, from: &str, to: &str) -> Result<Stri
         //     }
         // }
 
-
         if attempt < MAX_RETRIES {
             sleep(Duration::from_millis(200)).await;
         }
@@ -279,10 +282,7 @@ pub async fn online_translate(text: String, from: &str, to: &str) -> Result<Stri
 async fn translate_mymemory(text: &str, from: &str, to: &str) -> Result<String, TranslateError> {
     let url = "https://mymemory.translated.net/api/get";
 
-    let params = [
-        ("q", text),
-        ("langpair", &format!("{}|{}", from, to)),
-    ];
+    let params = [("q", text), ("langpair", &format!("{}|{}", from, to))];
 
     let res = HTTP_CLIENT
         .get(url)
@@ -369,17 +369,10 @@ async fn translate_libre(text: &str, from: &str, to: &str) -> Result<String, Tra
         .await
         .map_err(|e| TranslateError::Translate(e.to_string()))?;
 
-    Ok(json["translatedText"]
-        .as_str()
-        .unwrap_or("")
-        .to_string())
+    Ok(json["translatedText"].as_str().unwrap_or("").to_string())
 }
 
-async fn translate_google(
-    text: &str,
-    from: &str,
-    to: &str,
-) -> Result<String, TranslateError> {
+async fn translate_google(text: &str, from: &str, to: &str) -> Result<String, TranslateError> {
     let url = format!(
         "https://translate.googleapis.com/translate_a/single?client=gtx&sl={}&tl={}&&dt=t&dt=bd&dt=rm&dj=1&q={}",
         from,

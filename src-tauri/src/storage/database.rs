@@ -61,7 +61,8 @@ impl Database {
             ALTER TABLE words ADD COLUMN interval INTEGER DEFAULT 0;
             ALTER TABLE words ADD COLUMN repetitions INTEGER DEFAULT 0;
         "#,
-        ).ok();
+        )
+        .ok();
 
         // Инициализируем статистику если нет
         conn.execute(
@@ -108,7 +109,8 @@ impl Database {
                 target_lang,
                 now
             ],
-        ).map_err(|e| e.to_string())?;
+        )
+        .map_err(|e| e.to_string())?;
 
         Ok(conn.last_insert_rowid())
     }
@@ -164,13 +166,15 @@ impl Database {
         let review_limit = (limit as f32 * 0.7) as i32;
 
         // 🔥 REVIEW
-        let mut review_stmt = conn.prepare(
-            "SELECT id, word, translation, context, screenshot_path 
+        let mut review_stmt = conn
+            .prepare(
+                "SELECT id, word, translation, context, screenshot_path 
             FROM words 
             WHERE next_review <= ?1
             ORDER BY next_review ASC
-            LIMIT ?2"
-        ).map_err(|e| e.to_string())?;
+            LIMIT ?2",
+            )
+            .map_err(|e| e.to_string())?;
 
         let review_words: Vec<FlashcardWord> = review_stmt
             .query_map(params![now, review_limit], |row| {
@@ -182,8 +186,10 @@ impl Database {
                     screenshot_path: row.get(4)?,
                     mastery_level: 0, // больше не используем
                 })
-            }).map_err(|e| e.to_string())?
-            .collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
+            })
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?;
 
         // 🔥 NEW
         let remaining = limit - review_words.len() as i32;
@@ -191,13 +197,15 @@ impl Database {
         let mut new_words = vec![];
 
         if remaining > 0 {
-            let mut new_stmt = conn.prepare(
-                "SELECT id, word, translation, context, screenshot_path 
+            let mut new_stmt = conn
+                .prepare(
+                    "SELECT id, word, translation, context, screenshot_path 
                 FROM words 
                 WHERE repetitions = 0
                 ORDER BY created_at DESC
-                LIMIT ?1"
-            ).map_err(|e| e.to_string())?;
+                LIMIT ?1",
+                )
+                .map_err(|e| e.to_string())?;
 
             new_words = new_stmt
                 .query_map(params![remaining], |row| {
@@ -209,8 +217,10 @@ impl Database {
                         screenshot_path: row.get(4)?,
                         mastery_level: 0,
                     })
-                }).map_err(|e| e.to_string())?
-                .collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
+                })
+                .map_err(|e| e.to_string())?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| e.to_string())?;
         }
 
         // 🔀 MIX
@@ -303,7 +313,8 @@ impl Database {
                 next_review,
                 word_id
             ],
-        ).map_err(|e| e.to_string())?;
+        )
+        .map_err(|e| e.to_string())?;
 
         Ok(())
     }

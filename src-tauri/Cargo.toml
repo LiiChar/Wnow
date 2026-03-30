@@ -53,6 +53,9 @@ futures-util = "0.3.32"
 ocrs = "0.10"
 xcap = "0.7"
 rten = "0.21"
+rusttype = "0.9.3"              # Работа со шрифтами
+ab_glyph = "0.2.29"             # Рендеринг шрифтов
+tauri-plugin-notification = "2"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["winuser", "windef"] }

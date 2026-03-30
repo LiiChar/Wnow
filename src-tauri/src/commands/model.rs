@@ -1,4 +1,8 @@
-use std::{fs::{File, OpenOptions}, io::{self, Write}, path::{Path, PathBuf}};
+use std::{
+    fs::{File, OpenOptions},
+    io::{self, Write},
+    path::{Path, PathBuf},
+};
 use tauri::Emitter;
 use tokio::time::{sleep, Duration};
 
@@ -27,9 +31,9 @@ pub fn get_model_list() -> Vec<String> {
             list.push(path.file_name().unwrap().to_str().unwrap().to_string());
         }
     }
-    
+
     list
-} 
+}
 
 #[tauri::command]
 pub async fn get_available_models() -> Result<Vec<String>, String> {
@@ -37,27 +41,36 @@ pub async fn get_available_models() -> Result<Vec<String>, String> {
     let url = "https://huggingface.co/api/models?pipeline_tag=translation&search=gaudi/opus-mt-";
 
     let client = Client::new();
-    let response = client.get(url).send().await.expect("Failed get list available models");
+    let response = client
+        .get(url)
+        .send()
+        .await
+        .expect("Failed get list available models");
 
     if !response.status().is_success() {
         return Err(format!("Failed to get models: {}", response.status()).into());
     }
 
-    let models = response.json::<Vec<Model>>().await.expect("Failed parse list available models");
+    let models = response
+        .json::<Vec<Model>>()
+        .await
+        .expect("Failed parse list available models");
     for model in models {
         list.push(model.id);
     }
-    
+
     Ok(list)
 }
 
 fn get_lang_from_model_id(model_id: &str) -> String {
-    let lang = model_id.replace("gaudi/opus-mt-", "").replace("-ctranslate2", "");
+    let lang = model_id
+        .replace("gaudi/opus-mt-", "")
+        .replace("-ctranslate2", "");
     lang.to_string()
 }
 
 #[tauri::command]
-pub async fn download_model(model_id: &str, app: tauri::AppHandle,) -> Result<(), String> {
+pub async fn download_model(model_id: &str, app: tauri::AppHandle) -> Result<(), String> {
     let model_path = get_model_path();
 
     // Создаём папку для модели
@@ -69,26 +82,29 @@ pub async fn download_model(model_id: &str, app: tauri::AppHandle,) -> Result<()
 
     // Создаём папку для языка
     if !Path::new(&model_path).exists() {
-        std::fs::create_dir_all(model_path.to_str().unwrap()).expect("Failed create model lang directory");
+        std::fs::create_dir_all(model_path.to_str().unwrap())
+            .expect("Failed create model lang directory");
     }
 
     let model_files = vec![
-      ".gitattributes",
-      "config.json",
-      "generation_config.json",
-      "model.bin",
-      "README.md",
-      "shared_vocabulary.json",
-      "source.spm",
-      "target.spm",
-      "tokenizer_config.json",
-      "vocab.json",
+        ".gitattributes",
+        "config.json",
+        "generation_config.json",
+        "model.bin",
+        "README.md",
+        "shared_vocabulary.json",
+        "source.spm",
+        "target.spm",
+        "tokenizer_config.json",
+        "vocab.json",
     ];
 
     for file in model_files {
         let file_path = model_path.join(file);
         if !file_path.exists() {
-            download_model_file(model_id, file, &file_path, app.clone()).await.expect("Failed download model files");
+            download_model_file(model_id, file, &file_path, app.clone())
+                .await
+                .expect("Failed download model files");
         }
     }
 
@@ -114,7 +130,16 @@ pub async fn download_model_file(
 
     loop {
         attempt += 1;
-        let result = try_resume_download(&client, &url, filename, save_path, &tmp_path, model_id.to_string(), app.clone()).await;
+        let result = try_resume_download(
+            &client,
+            &url,
+            filename,
+            save_path,
+            &tmp_path,
+            model_id.to_string(),
+            app.clone(),
+        )
+        .await;
         match result {
             Ok(_) => break,
             Err(e) if attempt < MAX_RETRIES => {
@@ -162,7 +187,8 @@ async fn try_resume_download(
     }
 
     let mut response = request.send().await?;
-    if !response.status().is_success() && response.status() != reqwest::StatusCode::PARTIAL_CONTENT {
+    if !response.status().is_success() && response.status() != reqwest::StatusCode::PARTIAL_CONTENT
+    {
         return Err(format!("Failed to download file: {}", response.status()).into());
     }
 
@@ -178,7 +204,14 @@ async fn try_resume_download(
         downloaded += chunk.len() as u64;
 
         let progress = downloaded as f64 / total_size as f64 * 100.0;
-        app.emit("download-progress", DownloadProgress {model: model_id.clone(), progress}).ok();
+        app.emit(
+            "download-progress",
+            DownloadProgress {
+                model: model_id.clone(),
+                progress,
+            },
+        )
+        .ok();
     }
 
     // Когда всё скачано — переименовываем временный файл

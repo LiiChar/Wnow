@@ -1,9 +1,9 @@
-use std::time::Instant;
-use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_log::log::{log, Level};
 use crate::capture::Capture;
 use crate::ocr::{preprocess_for_tesseract_sys, recognize_with_boxes};
 use crate::platform::set_window_topmost;
+use std::time::Instant;
+use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_log::log::{log, Level};
 
 pub async fn show_translate(app: &AppHandle) {
     let scale = app

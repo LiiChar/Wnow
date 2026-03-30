@@ -1,6 +1,6 @@
+use crate::storage::Database;
 use tauri::AppHandle;
 use tauri::Manager;
-use crate::storage::Database;
 
 /// Инициализация базы данных
 pub fn setup_database(app: &AppHandle) {

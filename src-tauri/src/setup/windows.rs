@@ -1,5 +1,5 @@
+use crate::platform::{hide_webview_close_button, set_window_topmost};
 use tauri::{AppHandle, Emitter, Manager};
-use crate::platform::{set_window_topmost, hide_webview_close_button};
 
 /// Настройка overlay окна (прозрачное, для перевода)
 pub fn setup_overlay_window(app: &AppHandle) {

@@ -1,14 +1,14 @@
-use std::thread;
-use std::time::Duration;
-use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_log::log::{log, Level};
-use tauri_plugin_clipboard_manager::ClipboardExt;
-use enigo::{Enigo, Keyboard, Key, Settings};
 use crate::mouse::Mouse;
 use crate::ocr::OcrWord;
 use crate::platform::set_window_topmost;
 use crate::translation::translate;
 use crate::utils::fnv1a_hash;
+use enigo::{Enigo, Key, Keyboard, Settings};
+use std::thread;
+use std::time::Duration;
+use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_clipboard_manager::ClipboardExt;
+use tauri_plugin_log::log::{log, Level};
 
 /// Перевод выделенного текста (без изменения буфера обмена пользователя)
 pub async fn translate_selected_text(app: &AppHandle) {
@@ -71,7 +71,11 @@ pub async fn translate_selected_text(app: &AppHandle) {
 
     let uniq_id = fnv1a_hash(text.as_bytes());
 
-    log!(Level::Info, "Translating selected text: '{}'", &text[..text.len().min(50)]);
+    log!(
+        Level::Info,
+        "Translating selected text: '{}'",
+        &text[..text.len().min(50)]
+    );
 
     // 6. Переводим текст
     let translation = match translate(text.to_string(), "en", "ru").await {
@@ -85,7 +89,10 @@ pub async fn translate_selected_text(app: &AppHandle) {
     // Получаем позицию мыши для показа popup
     let mouse = Mouse::new();
     let (phys_x, phys_y) = mouse.get_position();
-    let scale = app.get_webview_window("overlay").map(|w| w.scale_factor().unwrap_or(1.0) as f32).unwrap_or(1.0);
+    let scale = app
+        .get_webview_window("overlay")
+        .map(|w| w.scale_factor().unwrap_or(1.0) as f32)
+        .unwrap_or(1.0);
     let logical_x = (phys_x as f32 / scale) as i32;
     let logical_y = (phys_y as f32 / scale) as i32;
 

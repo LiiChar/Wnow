@@ -12,21 +12,23 @@ mod translation;
 mod utils;
 mod windows;
 
-use tauri::Manager;
 use tauri::Emitter;
+use tauri::Manager;
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutState};
 
-pub use handlers::{show_translate, translate_word_at_cursor, translate_selected_text};
+pub use handlers::{
+    show_translate, show_translate_with_replacement, translate_selected_text,
+    translate_word_at_cursor,
+};
 pub use platform::set_window_topmost;
-pub use utils::{init_resource_dir, get_resource_dir};
+pub use utils::{get_resource_dir, init_resource_dir};
 pub use windows::windows::create_main_window;
 
 use crate::commands::common::start_global_mouse_stream;
 use crate::commands::translate::stop_floating_translate;
 use crate::setup::register_shortcut_handler;
+use crate::windows::windows::create_notification_window;
 use crate::windows::windows::create_overlay_window;
-
-
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -37,6 +39,7 @@ pub fn run() {
     let ctrl_shift_c = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyC);
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(
@@ -62,7 +65,7 @@ pub fn run() {
                                 let app_clone = app.clone();
                                 std::thread::spawn(move || {
                                     let rt = tokio::runtime::Runtime::new().unwrap();
-                                    rt.block_on(show_translate(&app_clone));
+                                    rt.block_on(show_translate_with_replacement(&app_clone));
                                 });
                             }
                             _ => {}
@@ -131,7 +134,10 @@ pub fn run() {
             commands::translation::set_translation_mode,
             commands::translation::get_current_translation_mode,
             commands::translation::get_translation_models,
-            commands::translation::is_model_available
+            commands::translation::is_model_available,
+            commands::notification::show_notification,
+            commands::text_replacement::translate_image_with_replacement,
+            commands::text_replacement::translate_fragment,
         ])
         .setup(move |app| {
             // let window = app.get_webview_window("main").unwrap();
@@ -147,6 +153,15 @@ pub fn run() {
             // start_global_mouse_stream(window);
             create_main_window(&app.handle())?;
             create_overlay_window(&app.handle())?;
+            create_notification_window(&app.handle())?;
+
+            use tauri_plugin_notification::NotificationExt;
+            app.notification()
+                .builder()
+                .title("Tauri")
+                .body("Tauri is awesome")
+                .show()
+                .unwrap();
             Ok(())
         })
         .run(tauri::generate_context!())

@@ -11,12 +11,21 @@ import { SelectionArea, SelectionMode } from '../../components/overlay/Selection
 import { BoxCanvas } from '../../components/box/BoxCanvas';
 import { FloatingTranslation, type FloatingTranslationType } from '../../components/overlay/FloatingTranslation';
 import { TextBox } from '../../shared/types/ocr';
-import { Check, Copy, FoldVertical, Trash } from 'lucide-solid';
+import { Check, Copy, FoldVertical, Trash, Image as ImageIcon, X } from 'lucide-solid';
 import { toaster } from '@kobalte/core/toast';
 import { ToastStatus } from '@/components/toaster/ToastStatus';
 import { log } from '@/shared/lib/log';
 import { getBlockTranslate } from '@/shared/api/translate';
+import { listener } from '@/shared/lib/listener';
+import { showNotification } from '@/shared/api/notification';
 
+interface TranslatedImagePayload {
+	image: string;
+	width: number;
+	height: number;
+	processing_time_ms: number;
+	boxes_count: number;
+}
 
 export function TranslatorOverlay() {
 	const [isSelectFragment, setIsSelectFragment] = createSignal(false);
@@ -26,6 +35,9 @@ export function TranslatorOverlay() {
 	const [fullCopied, setFullCopied] = createSignal(false);
 	const [isCompactMode, setIsCompactMode] = createSignal(true);
 
+	const [translatedImage, setTranslatedImage] = createSignal<string | null>(null);
+	const [imagePayload, setImagePayload] = createSignal<TranslatedImagePayload | null>(null);
+
 	const [floatingTranslation, setFloatingTranslation] =
 		createSignal<FloatingTranslationType | null>(null);
 
@@ -33,21 +45,23 @@ export function TranslatorOverlay() {
 		getCurrentWebviewWindow().setIgnoreCursorEvents(!enabled);
 	};
 
-		onMount(() => {
-		const unsubs: (() => void)[] = [];
-
-		const add = async <T,>(
-			event: string,
-			handler: (e: { payload: T }) => void,
-		) => {
-			const un = await listen<T>(event, handler);
-			unsubs.push(un);
-		};
-
+	onMount(() => {
+		let {add, unsubs} = listener();
 
 		add<TextBox[]>('show_translate', ({ payload }) => {
 			log.info('[LAYOUT][EVENT][show_translate]Listened to show_translate event with payload: ' + JSON.stringify(payload));
 			setBoxes(payload);
+			setShowFullTranslation(false);
+			setTranslatedImage(null);
+			setCursorEvents(true);
+		});
+
+		// Новое событие для изображения с заменой текста
+		add<TranslatedImagePayload>('show_translate_with_image', ({ payload }) => {
+			log.info('[LAYOUT][EVENT][show_translate_with_image] Received translated image');
+			setTranslatedImage(`data:image/png;base64,${payload.image}`);
+			setImagePayload(payload);
+			setBoxes([]);
 			setShowFullTranslation(false);
 			setCursorEvents(true);
 		});
@@ -60,6 +74,8 @@ export function TranslatorOverlay() {
 
 		add<void>('close_translate', () => {
 			setFloatingTranslation(null);
+			setTranslatedImage(null);
+			setImagePayload(null);
 		});
 
 		onCleanup(() => {
@@ -73,18 +89,22 @@ export function TranslatorOverlay() {
 			setShowFullTranslation(false);
 			setFullText('');
 			setFloatingTranslation(null);
+			setTranslatedImage(null);
+			setImagePayload(null);
 			setCursorEvents(false);
 		}
 	};
 
 
-	const copyFullText = () => {
+	const copyFullText = async () => {
 		navigator.clipboard.writeText(fullText());
 		setFullCopied(true);
 
-		toaster.show(p => (
-			<ToastStatus status='success' text='Скопировано' toastId={p.toastId} />
-		));
+		await showNotification({
+			title: 'Скопировано',
+			text: 'Текст был скопирован в буфер обмена',
+			duration: 2000,
+		});
 
 		setTimeout(() => setFullCopied(false), 2000);
 	};
@@ -93,6 +113,66 @@ export function TranslatorOverlay() {
 
 	return (
 			<main class='fixed inset-0 z-9998' onClick={closeAll}>
+				{/* Отображение изображения с заменой текста */}
+				<Show when={translatedImage() !== null}>
+					<div
+						class='fixed inset-0 flex items-center justify-center bg-black/80'
+						onClick={e => e.stopPropagation()}
+					>
+						<div class='relative max-w-[95vw] max-h-[95vh]'>
+							<img
+								src={translatedImage()!}
+								alt='Translated'
+								class='max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl'
+							/>
+							
+							{/* Информация об обработке */}
+							<Show when={imagePayload()}>
+								<div class='absolute top-2 left-2 glass-dark px-3 py-2 rounded-lg text-xs'>
+									<div class='flex items-center gap-2 text-neutral-400'>
+										<ImageIcon size={12} />
+										<span>
+											{imagePayload()!.boxes_count} боксов • 
+											{imagePayload()!.processing_time_ms}мс
+										</span>
+									</div>
+								</div>
+							</Show>
+
+							{/* Кнопки управления */}
+							<div class='absolute top-2 right-2 flex gap-2'>
+								<button
+									onClick={() => {
+										setTranslatedImage(null);
+										setImagePayload(null);
+									}}
+									class='glass-dark p-2 rounded-lg hover:bg-neutral-700 transition-colors'
+									title='Закрыть'
+								>
+									<X size={16} />
+								</button>
+							</div>
+
+							{/* Кнопка переключения режима */}
+							<Show when={imagePayload()}>
+								<div class='absolute bottom-4 left-1/2 -translate-x-1/2'>
+									<button
+										onClick={() => {
+											// Переключение на режим с боксами (если нужно)
+											setTranslatedImage(null);
+											setImagePayload(null);
+										}}
+										class='glass-dark px-4 py-2 rounded-lg text-xs flex items-center gap-2 hover:bg-neutral-700 transition-colors'
+									>
+										<Check size={12} />
+										<span>Показать боксы</span>
+									</button>
+								</div>
+							</Show>
+						</div>
+					</div>
+				</Show>
+
 				<Show when={boxes().length > 0}>
 					<BoxCanvas boxes={boxes} text={fullText}/>
 				</Show>

@@ -1,15 +1,15 @@
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Instant;
-use image::RgbaImage;
-use tauri::{Emitter, WebviewWindow};
-use tauri_plugin_log::log::{log, Level};
 use crate::capture::Capture;
 use crate::get_resource_dir;
-use crate::ocr::{OcrWord, postprocess_ocr, preprocess_for_tesseract_sys, recognize_with_boxes};
+use crate::ocr::{postprocess_ocr, preprocess_for_tesseract_sys, recognize_with_boxes, OcrWord};
 use crate::translation::translate as t;
 use crate::utils::fnv1a_hash;
 use futures::future::join_all;
+use image::RgbaImage;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::Instant;
+use tauri::{Emitter, WebviewWindow};
+use tauri_plugin_log::log::{log, Level};
 
 static FLOATING_TRANSLATE_RUNNING: once_cell::sync::Lazy<Arc<AtomicBool>> =
     once_cell::sync::Lazy::new(|| Arc::new(AtomicBool::new(false)));
@@ -20,7 +20,6 @@ pub fn get_block_translate(
     pos: (i32, i32),
     size: (i32, i32),
 ) -> Result<(String, Vec<OcrWord>), String> {
-
     let scale = webview_window.scale_factor().unwrap_or(1.0) as f32;
 
     let phys_x = (pos.0 as f32 * scale) as i32;
@@ -30,8 +29,7 @@ pub fn get_block_translate(
 
     let mut capture = Capture::new();
 
-    let (text, clear_boxes) =
-        box_ocr(&mut capture, phys_x, phys_y, phys_w, phys_h, scale)?;
+    let (text, clear_boxes) = box_ocr(&mut capture, phys_x, phys_y, phys_w, phys_h, scale)?;
 
     if text.trim().is_empty() && clear_boxes.is_empty() {
         return Ok(("".to_string(), vec![]));
@@ -43,9 +41,9 @@ pub fn get_block_translate(
     requests.extend(clear_boxes.iter().map(|b| b.text.clone()));
 
     // 👇 блокируем async внутри sync функции
-    let results = tauri::async_runtime::block_on(
-        join_all(requests.into_iter().map(|text| t(text, "en", "ru")))
-    );
+    let results = tauri::async_runtime::block_on(join_all(
+        requests.into_iter().map(|text| t(text, "en", "ru")),
+    ));
 
     let mut translated_text = text.clone();
     let mut translated_boxes = Vec::with_capacity(clear_boxes.len());
@@ -53,7 +51,12 @@ pub fn get_block_translate(
     for (i, result) in results.into_iter().enumerate() {
         if let Ok(translated) = result {
             if i == 0 {
-                log!(Level::Info, "[translate] translated text: {}, source: {}", translated, text.clone());
+                log!(
+                    Level::Info,
+                    "[translate] translated text: {}, source: {}",
+                    translated,
+                    text.clone()
+                );
                 translated_text = translated;
             } else {
                 let b = &clear_boxes[i - 1];
@@ -80,7 +83,6 @@ pub async fn start_floating_translate(
     pos: (i32, i32),
     size: (i32, i32),
 ) -> Result<(), String> {
-
     if FLOATING_TRANSLATE_RUNNING.load(Ordering::Relaxed) {
         return Ok(());
     }
@@ -89,7 +91,6 @@ pub async fn start_floating_translate(
     let running = FLOATING_TRANSLATE_RUNNING.clone();
 
     tauri::async_runtime::spawn_blocking(move || {
-
         let scale = webview_window.scale_factor().unwrap_or(1.0) as f32;
 
         let phys_x = (pos.0 as f32 * scale) as i32;
@@ -100,7 +101,6 @@ pub async fn start_floating_translate(
         let mut capture = Capture::new();
 
         while running.load(Ordering::Relaxed) {
-
             let start = std::time::Instant::now();
 
             if let Ok((text, clear_boxes)) =
@@ -117,9 +117,9 @@ pub async fn start_floating_translate(
                 requests.extend(clear_boxes.iter().map(|b| b.text.clone()));
 
                 // ⚠️ тут блокирующий runtime
-                let results = tauri::async_runtime::block_on(
-                    join_all(requests.into_iter().map(|text| t(text, "en", "ru")))
-                );
+                let results = tauri::async_runtime::block_on(join_all(
+                    requests.into_iter().map(|text| t(text, "en", "ru")),
+                ));
 
                 let mut translated_text = text.clone();
                 let mut translated_boxes = Vec::new();
@@ -160,7 +160,6 @@ pub async fn start_floating_translate(
     Ok(())
 }
 
-
 pub fn box_ocr(
     capture: &mut Capture,
     phys_x: i32,
@@ -169,15 +168,9 @@ pub fn box_ocr(
     phys_h: i32,
     scale: f32,
 ) -> Result<(String, Vec<OcrWord>), String> {
-
     let buffer = capture.capture_fragment(phys_x, phys_y, phys_w, phys_h);
 
-    let img = preprocess_for_tesseract_sys(
-        &buffer,
-        phys_w as u32,
-        phys_h as u32,
-        30.0,
-    );
+    let img = preprocess_for_tesseract_sys(&buffer, phys_w as u32, phys_h as u32, 30.0);
 
     let (text, boxes) = recognize_with_boxes(&img, phys_w, phys_h, scale);
 
@@ -194,7 +187,7 @@ pub fn box_ocr(
                 buffer.clone(), // можно оставить только в debug
             ) {
                 let _ = debug_img.save(
-                    get_resource_dir().join(format!("debug_{}.png", fnv1a_hash(text.as_bytes())))
+                    get_resource_dir().join(format!("debug_{}.png", fnv1a_hash(text.as_bytes()))),
                 );
             }
         }
@@ -211,6 +204,10 @@ pub fn stop_floating_translate() {
 }
 
 #[tauri::command]
-pub async fn translate(text: String, source_lang: &str, target_lang: &str) -> Result<String, String> {
+pub async fn translate(
+    text: String,
+    source_lang: &str,
+    target_lang: &str,
+) -> Result<String, String> {
     t(text.clone(), source_lang, target_lang).await.or(Ok(text))
 }

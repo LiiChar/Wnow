@@ -44,7 +44,7 @@ pub fn create_main_window(app: &AppHandle) -> Result<WebviewWindow, tauri::Error
         .accept_first_mouse(true)
         .always_on_top(false)
         .closable(true)
-        .max_inner_size(364f64, 530f64)
+        .min_inner_size(364f64, 530f64)
         .inner_size(364f64, 530f64)
         .resizable(true)
         .focused(true)
@@ -55,19 +55,37 @@ pub fn create_main_window(app: &AppHandle) -> Result<WebviewWindow, tauri::Error
     Ok(window)
 }
 
-
-pub fn create_overlay_window(
-    app: &AppHandle,
-) -> Result<WebviewWindow, tauri::Error> {
-    let window = WebviewWindowBuilder::new(app, "overlay", WebviewUrl::App("overlay.html".into()))
-        .title("Transcendia - Overlay")
+pub fn create_notification_window(app: &AppHandle) -> Result<WebviewWindow, tauri::Error> {
+    let window = WebviewWindowBuilder::new(app, "notification", WebviewUrl::App("notification.html".into()))
+        .title("Wnow - Notification")
         .always_on_top(true)
         .visible_on_all_workspaces(true)
         .shadow(false)
         .decorations(false)
         .transparent(true)
         .resizable(false)
-        // .skip_taskbar(true)
+        .skip_taskbar(true)
+        .visible(false)
+        .content_protected(true)
+
+        .build()?;
+    window.set_ignore_cursor_events(true)?;
+
+
+
+    Ok(window)
+}
+
+pub fn create_overlay_window(app: &AppHandle) -> Result<WebviewWindow, tauri::Error> {
+    let window = WebviewWindowBuilder::new(app, "overlay", WebviewUrl::App("overlay.html".into()))
+        .title("Wnow - Overlay")
+        .always_on_top(true)
+        .visible_on_all_workspaces(true)
+        .shadow(false)
+        .decorations(false)
+        .transparent(true)
+        .resizable(false)
+        .skip_taskbar(true)
         .visible(false)
         .content_protected(true)
         .fullscreen(true)
@@ -82,15 +100,19 @@ pub fn create_overlay_window(
         .find(|m| m.is_primary().unwrap() == true)
         .unwrap_or(monitors.get(0).expect("Cannot find any monitor"));
     let scale = monitor.scale_factor().unwrap();
-    window.set_position(LogicalPosition { x: monitor.x().unwrap() as f32 * scale, y: monitor.y().unwrap() as f32 * scale })?;
-    window.set_size(LogicalSize { width: monitor.width().unwrap() as f32, height: monitor.height().unwrap() as f32 })?;
+    window.set_position(LogicalPosition {
+        x: monitor.x().unwrap() as f32 * scale,
+        y: monitor.y().unwrap() as f32 * scale,
+    })?;
+    window.set_size(LogicalSize {
+        width: monitor.width().unwrap() as f32,
+        height: monitor.height().unwrap() as f32,
+    })?;
     window.show()?;
     window.set_focus()?;
 
     Ok(window)
 }
-
-
 
 // pub fn create_download_window(app: &AppHandle) -> Result<WebviewWindow, tauri::Error> {
 //     let window =
