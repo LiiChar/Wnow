@@ -1,16 +1,17 @@
 import { listen } from '@tauri-apps/api/event';
-import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import concaveman from 'concaveman';
-import fitty from 'fitty';
 import roundPolygon, { getSegments } from 'round-polygon';
-import { createEffect, createSignal, For, onCleanup, onMount, Show } from 'solid-js';
+import { createSignal, For, onCleanup, onMount, Show } from 'solid-js';
 
 import type { GroupedBox } from '@/shared/lib/points';
 import type { TextBox } from '@/shared/types/ocr';
 
-import { getBlockTranslate, startFloatingImageTranslate, startFloatingTranslate } from '@/shared/api/translate';
+import { getSettings } from '@/shared/api/settings';
+import { startFloatingImageTranslate, startFloatingTranslate } from '@/shared/api/translate';
 import { log } from '@/shared/lib/log';
 import { groupBoxes } from '@/shared/lib/points';
+
+import { BoxElement } from '../box/BoxElement';
 
 export interface Area {
 	h: number;
@@ -101,11 +102,13 @@ export const BoxPolygon = (props: BoxPolygonProps) => {
 
 export const FloatingTranslation = (props: Props) => {
 	const [translation, setTranslation] = createSignal<TextBox[]>([]);
+	const [translationGrouped, setTranslationGrouped] = createSignal<GroupedBox[]>([]);
 
 
 
 	onMount(async () => {
 		const unsubs: (() => void)[] = [];
+		const settings = await getSettings();
 
 		const add = async <T,>(
 			event: string,
@@ -115,20 +118,25 @@ export const FloatingTranslation = (props: Props) => {
 			unsubs.push(un);
 		};
 		
-		add<[string, TextBox[]]>('floating_translate', ({ payload }) => {
+		add<[string, TextBox[]]>('floating_translate', async ({ payload }) => {
 			log.info(
 				`[LAYOUT][EVENT][floating_translate]Listened to floating_translate event with payload: ${ 
 					JSON.stringify(payload)}`,
 			);
+			
 
-			const grouped = groupBoxes(payload[1]);
-
-
-			setTranslation(payload[1]);
+			if (settings.image_replacement) {
+				setTranslation(payload[1]);
+			} else {
+				setTranslationGrouped(groupBoxes(payload[1]));
+			}
 		});
 
-		await startFloatingImageTranslate([props.data.area.x, props.data.area.y], [props.data.area.w, props.data.area.h]);
-		// await startFloatingTranslate([props.data.area.x, props.data.area.y], [props.data.area.w, props.data.area.h]);
+		if (settings.image_replacement) {
+			await startFloatingImageTranslate([props.data.area.x, props.data.area.y], [props.data.area.w, props.data.area.h]);
+		} else {
+			await startFloatingTranslate([props.data.area.x, props.data.area.y], [props.data.area.w, props.data.area.h]);
+		}
 		
 		onCleanup(() => {
 			unsubs.forEach(fn => fn());
@@ -150,40 +158,34 @@ export const FloatingTranslation = (props: Props) => {
 				}}
 				class='absolute border-2 border-border rounded select-none cursor-move'
 			>
-				{/* <For each={translation()}>
-					{box => (
+				<Show when={translationGrouped().length > 0}>
+					<For each={translationGrouped()}>{item => <BoxPolygon boxes={item.boxes} />}</For>
+					<For each={translationGrouped()}>
+						{box => (
 							<div
-								style={{
-									left: `${box.grouped.x}px`,
-									top: `${box.grouped.y}px`,
-									width: `${box.grouped.w}px`,
-									height: `${box.grouped.h}px`,
-								}}
-								class='absolute overflow-hidden p-1'
+							style={{
+								left: `${box.grouped.x}px`,
+								top: `${box.grouped.y}px`,
+								width: `${box.grouped.w}px`,
+								height: `${box.grouped.h}px`,
+							}}
+							class='absolute overflow-hidden p-1'
 							>
-								{box.grouped.translation ?? box.grouped.text}
-							</div>
+									{box.grouped.translation ?? box.grouped.text}
+								</div>
+							)}
+					</For>
+				</Show>
+				<Show when={translation().length > 0}>
+					<For each={translation()}>
+						{box => (
+							<BoxElement box={box} showPopover={false} />
 						)}
-				</For> */}
-				<For each={translation()}>
-					{box => (
-							<div
-								style={{
-									left: `${box.x}px`,
-									top: `${box.y}px`,
-									width: `${box.w}px`,
-									height: `${box.h}px`,
-								}}
-								class='absolute overflow-hidden p-1'
-							>
-								<img
-									class="absolute top-0 left-0 w-full h-full pointer-events-none"
-									src={`data:image/png;base64,${box.image}`}
-								/>
-							</div>
-						)}
-				</For>
+					</For>
+				</Show>
 			</div>
 		</div>
 	);
 }
+
+	

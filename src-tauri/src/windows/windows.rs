@@ -1,23 +1,31 @@
-use tauri::utils::config::WindowEffectsConfig;
-use tauri::utils::{WindowEffect, WindowEffectState};
-use tauri::webview::Color;
 use tauri::{
     AppHandle, LogicalPosition, LogicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
 };
+use tauri_plugin_log::log::{log, Level};
+
+use crate::storage::Database;
 
 pub fn create_main_window(app: &AppHandle) -> Result<WebviewWindow, tauri::Error> {
-    let window = WebviewWindowBuilder::new(app, "index", WebviewUrl::App("index.html".into()))
+    let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
         .title("Wnow - Configuration")
         .accept_first_mouse(true)
-        .always_on_top(false)
-        .closable(true)
         .min_inner_size(364f64, 530f64)
         .inner_size(364f64, 530f64)
         .resizable(true)
         .focused(true)
         .decorations(false)
         .build()?;
-    window.set_focus()?;
+    
+    let start_minimazed: String = Database::get_setting("start_minimized").expect("Couldn get settings 'start_minimazed'");
+    println!("start_minimazed: {}", start_minimazed);
+    if start_minimazed == "true" {
+        let _ = window.hide();
+    } else {
+        window.show()?;
+        window.set_focus()?;
+    }
+
+    log!(Level::Info, "Main window initialized");
 
     Ok(window)
 }
@@ -59,6 +67,8 @@ pub fn create_notification_window(app: &AppHandle) -> Result<WebviewWindow, taur
         .set_position(tauri::LogicalPosition::new(x, y))
         .ok();
 
+    log!(Level::Info, "Notification window initialized");
+
     Ok(window)
 }
 
@@ -74,7 +84,6 @@ pub fn create_overlay_window(app: &AppHandle) -> Result<WebviewWindow, tauri::Er
         .skip_taskbar(true)
         .content_protected(true)
         .visible(false)
-        // .fullscreen(true)
         .maximized(true)
         .build()?;
     window.set_ignore_cursor_events(true)?;
@@ -97,6 +106,8 @@ pub fn create_overlay_window(app: &AppHandle) -> Result<WebviewWindow, tauri::Er
     window.show()?;
     // window.set_focus()?;
     // window.set_shadow(false)?;
+
+    log!(Level::Info, "Overlay window initialized");
 
     Ok(window)
 }

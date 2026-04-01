@@ -1,11 +1,11 @@
 import { createStore } from "solid-js/store";
 
-type LayoutStore = {
-  headerLabel: string;
+interface LayoutStore {
   headerDescription?: string;
-  headerVisible: boolean;
+  headerLabel: string;
   headerStyle?: string;
-};
+  headerVisible: boolean;
+}
 
 export const [layoutStore, setLayoutStore] = createStore<LayoutStore>({
 	headerLabel: 'Словарь',

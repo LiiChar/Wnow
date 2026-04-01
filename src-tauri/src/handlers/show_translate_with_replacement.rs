@@ -9,6 +9,7 @@ use crate::capture::Capture;
 use crate::img::{ocr_word_to_translated_box, replace_text_in_image, TextReplacementParams};
 use crate::ocr::{postprocess_ocr, preprocess_for_tesseract_sys, recognize_with_boxes, OcrWord};
 use crate::platform::set_window_topmost;
+use crate::translation::local::get_translate_lang;
 use crate::translation::translate;
 
 /// Один фрагмент (картинка + позиция)
@@ -61,10 +62,12 @@ pub async fn show_translate_with_replacement(app: &AppHandle) {
     // 4. Translate
     let translate_requests: Vec<String> = boxes.iter().map(|b| b.text.clone()).collect();
 
+    let (source_lang, target_lang) = get_translate_lang();
+
     let results = join_all(
         translate_requests
             .iter()
-            .map(|text| translate(text.clone(), "en", "ru")),
+            .map(|text| translate(text.clone(), &source_lang, &target_lang)),
     )
     .await;
 

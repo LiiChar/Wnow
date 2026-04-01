@@ -15,7 +15,7 @@ import type { NotificationItem, NotificationPayload } from '@/shared/types/notif
 
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
-import { get_main_monitor } from '@/shared/api/monitor';
+import { getMainMonitor } from '@/shared/api/monitor';
 import { listener } from '@/shared/lib/listener';
 import { log } from '@/shared/lib/log';
 
@@ -144,7 +144,8 @@ export const Notification = () => {
 				Math.max(20, count * CARD_HEIGHT + (count - 1) * GAP),
 			);
 
-			const monitor = await get_main_monitor();
+			const monitor = await getMainMonitor();
+
 			const scale = monitor.scale_factor;
 
 			const x = (monitor.x + monitor.width - WINDOW_WIDTH - PADDING) / scale;

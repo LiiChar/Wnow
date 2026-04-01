@@ -45,7 +45,7 @@ export const getBlockImageTranslate = async (
 	position: PosTranslateBlock,
 	size: SizeTranslateBlock,
 ) => {
-	const result = await invoke<TextBox[]>('get_block_image_translate', {
+	const result = await invoke<[string, TextBox[]]>('get_block_image_translate', {
 		pos: position,
 		size,
 	});

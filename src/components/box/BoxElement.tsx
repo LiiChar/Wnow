@@ -8,7 +8,8 @@ import { addWordToStudy } from "@/shared/api/stude";
 
 interface BoxElementProps {
 	box: TextBox
-  index: number;
+  index?: number;
+	showPopover?: boolean;
   onClick?: (box: TextBox) => void;
   onHover?: (box: TextBox) => void;
 }
@@ -73,9 +74,9 @@ export const BoxElement = (props: BoxElementProps) => {
 				top: `${props.box.y - padding}px`,
 				width: `${props.box.w + padding * 2}px`,
 				height: `${props.box.h + padding * 2}px`,
-				'animation-delay': `${props.index * 20}ms`,
+				'animation-delay': `${props.index ?? 0 * 20}ms`,
 			}}
-			class='fixed cursor-pointer z-10000'
+			class='absolute cursor-pointer z-10000'
 			onClick={e => {
 				e.stopPropagation();
 				setIsSelected(prev => !prev);
@@ -87,43 +88,30 @@ export const BoxElement = (props: BoxElementProps) => {
 			}}
 			onMouseLeave={() => setIsHovered(false)}
 		>
-			<div
-				class='absolute inset-0 rounded transition-all duration-150'
-				// style={{
-				// 	background: isHovered()
-				// 		? 'rgba(163, 163, 163, 0.25)'
-				// 		: 'rgba(163, 163, 163, 0.1)',
-				// 	border: isHovered()
-				// 		? '1.5px solid rgba(163, 163, 163, 0.8)'
-				// 		: '1px solid rgba(163, 163, 163, 0.4)',
-				// }}
-			/>
-
-			{/* <div
-        style={{
-						background: isHovered() ? "rgba(163, 163, 163, 0.25)" : "rgba(163, 163, 163, 0.1)",
-						border: isHovered() ? "1.5px solid rgba(163, 163, 163, 0.8)" : "1px solid rgba(163, 163, 163, 0.4)",
+			<Show when={!props.box.image}>
+				<div
+					style={{
+						background: isHovered()
+							? 'rgba(163, 163, 163, 0.25)'
+							: 'rgba(163, 163, 163, 0.1)',
+						border: isHovered()
+							? '1.5px solid rgba(163, 163, 163, 0.8)'
+							: '1px solid rgba(163, 163, 163, 0.4)',
 					}}
-				class="absolute inset-0 rounded transition-all duration-150"
-      >
-				<Show when={props.box.image}>
-					<img
-						class="absolute top-0 left-0 w-full h-full pointer-events-none"
-						src={`data:image/png;base64,${props.box.image}`}
-						/>
-				</Show>
-			</div> */}
+					class='absolute inset-0 rounded transition-all duration-150'
+				/>
+			</Show>
 
-			<div
-				class="absolute inset-0 rounded transition-all duration-150"
-      >
-				<Show when={props.box.image}>
-					<img
-						class="absolute top-0 left-0 w-full h-full pointer-events-none"
-						src={`data:image/png;base64,${props.box.image}`}
-						/>
-				</Show>
-			</div>
+			<Show when={props.box.image}>
+				<div
+					class="absolute inset-0 rounded transition-all duration-150"
+				>
+						<img
+							class="absolute top-0 left-0 w-full h-full pointer-events-none"
+							src={`data:image/png;base64,${props.box.image}`}
+							/>
+				</div>
+			</Show>
 
 			<Show when={isHovered() || isSelected()}>
 				<div

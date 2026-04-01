@@ -53,8 +53,8 @@ futures-util = "0.3.32"
 ocrs = "0.10"
 xcap = "0.7"
 rten = "0.21"
-rusttype = "0.9.3"              # Работа со шрифтами
-ab_glyph = "0.2.29"             # Рендеринг шрифтов
+rusttype = "0.9.3"             
+ab_glyph = "0.2.29"          
 tauri-plugin-notification = "2"
 
 [target.'cfg(windows)'.dependencies]
@@ -78,10 +78,10 @@ opt-level = 3
 # incremental = true # Компилируйте бинарный файл меньшими шагами.
 
 #[profile.release]
-# codegen-units = 1 # Позволяет LLVM выполнять оптимизацию более эффективно.
-# lto = true # Включает оптимизации на этапе линковки.
-# opt-level = "s" # Приоритизирует малый размер бинарного файла. Используйте `3`, если вы предпочитаете скорость.
-# panic = "abort" # Повышает производительность, отключая обработчики паники.
-# strip = true # Удаляет отладочные символы.
+# codegen-units = 1 
+# lto = true 
+# opt-level = "s"
+# panic = "abort" 
+# strip = true 
 
 

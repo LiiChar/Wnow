@@ -25,7 +25,6 @@ pub use platform::set_window_topmost;
 pub use utils::{get_resource_dir, init_resource_dir};
 pub use windows::windows::create_main_window;
 
-use crate::commands::common::start_global_mouse_stream;
 use crate::commands::translate::stop_floating_translate;
 use crate::setup::register_shortcut_handler;
 use crate::windows::windows::create_notification_window;
@@ -156,7 +155,6 @@ pub fn run() {
 
             setup::setup_tray(&app.handle())?;
 
-            // start_global_mouse_stream(window);
             create_main_window(&app.handle())?;
             create_overlay_window(&app.handle())?;
             create_notification_window(&app.handle())?;

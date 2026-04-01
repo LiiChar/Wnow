@@ -1,14 +1,16 @@
-import { createSignal, createEffect, Show } from 'solid-js';
-import type { FlashcardWord, LearningStats } from '../shared/types/storage';
 import { Check, RefreshCcw, X, Zap } from 'lucide-solid';
-import { Card, CardContent } from '@/components/ui/Card';
+import { createEffect, createSignal, Show } from 'solid-js';
+
 import { Button } from '@/components/ui/Button';
-import { useHeader } from '@/shared/hooks/useHeader';
-import { setLayoutStore } from '@/shared/stores/layout';
+import { Card, CardContent } from '@/components/ui/Card';
 import { Progress } from '@/components/ui/Progres';
 import { getLearningStats, getWordsForStudy, updateWordProgress } from '@/shared/api/stude';
+import { useHeader } from '@/shared/hooks/useHeader';
+import { setLayoutStore } from '@/shared/stores/layout';
 
-export function StudyPage() {
+import type { FlashcardWord, LearningStats } from '../shared/types/storage';
+
+export const StudyPage = () => {
   const [words, setWords] = createSignal<FlashcardWord[]>([]);
   const [currentIndex, setCurrentIndex] = createSignal(0);
   const [showAnswer, setShowAnswer] = createSignal(false);
@@ -71,13 +73,12 @@ export function StudyPage() {
 
 			<div class='flex-1 flex items-center justify-center pb-22'>
 				<Show
-					when={!loading()}
 					fallback={
 						<div class='w-8 h-8 border-2 border-neutral-400 border-t-transparent rounded-full animate-spin' />
 					}
+					when={!loading()}
 				>
 					<Show
-						when={words().length > 0}
 						fallback={
 							<Card class='text-center max-w-sm'>
 								<CardContent class='p-8'>
@@ -86,16 +87,16 @@ export function StudyPage() {
 									</div>
 									<h2 class='text-lg font-semibold  mb-2'>Отлично!</h2>
 									<p class='text-neutral-400 mb-6'>Нет слов для повторения</p>
-									<Button onClick={restartSession} class='gap-1.5'>
+									<Button class='gap-1.5' onClick={restartSession}>
 										<RefreshCcw size={16} />
 										Обновить
 									</Button>
 								</CardContent>
 							</Card>
 						}
+						when={words().length > 0}
 					>
 						<Show
-							when={!isComplete()}
 							fallback={
 								<Card class='text-center max-w-sm'>
 									<CardContent class='p-8'>
@@ -119,13 +120,14 @@ export function StudyPage() {
 												<div class='text-xs text-neutral-500'>Ошибок</div>
 											</div>
 										</div>
-										<Button onClick={restartSession} class='w-full gap-1.5'>
+										<Button class='w-full gap-1.5' onClick={restartSession}>
 											<RefreshCcw size={16} />
 											Начать заново
 										</Button>
 									</CardContent>
 								</Card>
 							}
+							when={!isComplete()}
 						>
 							<div class='w-full max-w-md'>
 								<Card
@@ -159,16 +161,16 @@ export function StudyPage() {
 								<Show when={showAnswer()}>
 									<div class='flex gap-3 mt-4'>
 										<Button
-											variant='outline'
 											class='flex-1 border-red-800 text-red-400 hover:bg-red-950 gap-1.5'
+											variant='outline'
 											onClick={() => handleAnswer(false)}
 										>
 											<X size={16} />
 											Не знал
 										</Button>
 										<Button
-											variant='secondary'
 											class='flex-1 gap-1.5'
+											variant='secondary'
 											onClick={() => handleAnswer(true)}
 										>
 											<Check size={16} />

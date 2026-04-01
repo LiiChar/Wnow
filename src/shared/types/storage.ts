@@ -37,6 +37,7 @@ export interface LearningStats {
 }
 
 export interface AppSettings {
+  image_replacement: boolean;
   theme: 'light' | 'dark' | 'system';
   source_lang: string;
   target_lang: string;
@@ -48,9 +49,17 @@ export interface AppSettings {
   show_notifications: boolean;
   minimize_to_tray: boolean;
   start_minimized: boolean;
-  start_mode: 'app' | 'overlay'; // Что открывать при запуске
-  is_pro: boolean;
-  pro_expires: number | null;
+  // Новые настройки
+  auto_launch: boolean;
+  overlay_opacity: number;
+  font_size: 'small' | 'medium' | 'large';
+  overlay_position: 'top' | 'bottom' | 'center';
+  auto_copy_translation: boolean;
+  hide_after_translation: boolean;
+  overlay_duration: number;
+  enable_sound: boolean;
+  show_word_context: boolean;
+  compact_mode: boolean;
 }
 
 export const LANGUAGES = [

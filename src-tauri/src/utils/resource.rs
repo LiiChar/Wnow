@@ -1,18 +1,24 @@
 use once_cell::sync::OnceCell;
 use std::path::PathBuf;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, path::BaseDirectory};
 
 static RESOURCE_DIR: OnceCell<PathBuf> = OnceCell::new();
 
 pub fn init_resource_dir(app: &AppHandle) {
-    let _path = app
-        .path()
-        .resource_dir()
-        .expect("failed to get resource dir");
+
+    let mut resource_path = PathBuf::new();
+
+    if cfg!(dev) {
+        resource_path = "E:/code/pet-project/Wnow/src-tauri/resources".into();
+    } else {
+        resource_path = app.path().resolve("resources", BaseDirectory::Resource).expect("Failed to resolve resource path");
+    }
+
+    println!("Initialize resource dir: {}", resource_path.display());
 
     RESOURCE_DIR
         .set(PathBuf::from(
-            "E:/code/pet-project/Wnow/src-tauri/resources",
+            resource_path,
         ))
         .expect("RESOURCE_DIR already set");
     // RESOURCE_DIR.set(path).expect("RESOURCE_DIR already set");

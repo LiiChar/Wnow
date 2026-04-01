@@ -9,6 +9,7 @@ use once_cell::sync::Lazy;
 use tauri_plugin_log::log::{log, Level};
 
 use crate::get_resource_dir;
+use crate::storage::Database;
 
 pub mod simple {
     use std::collections::HashMap;
@@ -176,4 +177,10 @@ pub fn translate_local_translator(text: &str, from: &str, to: &str) -> Result<St
 
 pub fn translate_local(text: &str, from: &str, to: &str) -> String {
     SIMPLE_TRANSLATOR.translate_text(text, from, to)
+}
+
+
+pub fn get_translate_lang() -> (String, String) {
+    let settings = Database::get_all_settings();
+    (settings.source_lang, settings.target_lang)
 }

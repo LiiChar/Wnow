@@ -421,6 +421,9 @@ impl Database {
         if let Some(v) = Self::get_setting("hotkey_translate_screen") {
             settings.hotkey_translate_screen = v;
         }
+        if let Some(v) = Self::get_setting("hotkey_translate_clipboard") {
+            settings.hotkey_translate_clipboard = v;
+        }
         if let Some(v) = Self::get_setting("auto_save_words") {
             settings.auto_save_words = v == "true";
         }
@@ -433,8 +436,39 @@ impl Database {
         if let Some(v) = Self::get_setting("start_minimized") {
             settings.start_minimized = v == "true";
         }
-        if let Some(v) = Self::get_setting("is_pro") {
-            settings.is_pro = v == "true";
+        if let Some(v) = Self::get_setting("image_replacement") {
+            settings.image_replacement = v == "true";
+        }
+        // Новые настройки
+        if let Some(v) = Self::get_setting("auto_launch") {
+            settings.auto_launch = v == "true";
+        }
+        if let Some(v) = Self::get_setting("overlay_opacity") {
+            settings.overlay_opacity = v.parse().unwrap_or(95);
+        }
+        if let Some(v) = Self::get_setting("font_size") {
+            settings.font_size = v;
+        }
+        if let Some(v) = Self::get_setting("overlay_position") {
+            settings.overlay_position = v;
+        }
+        if let Some(v) = Self::get_setting("auto_copy_translation") {
+            settings.auto_copy_translation = v == "true";
+        }
+        if let Some(v) = Self::get_setting("hide_after_translation") {
+            settings.hide_after_translation = v == "true";
+        }
+        if let Some(v) = Self::get_setting("overlay_duration") {
+            settings.overlay_duration = v.parse().unwrap_or(5000);
+        }
+        if let Some(v) = Self::get_setting("enable_sound") {
+            settings.enable_sound = v == "true";
+        }
+        if let Some(v) = Self::get_setting("show_word_context") {
+            settings.show_word_context = v == "true";
+        }
+        if let Some(v) = Self::get_setting("compact_mode") {
+            settings.compact_mode = v == "true";
         }
 
         settings
@@ -448,6 +482,7 @@ impl Database {
         Self::set_setting("hotkey_translate_word", &settings.hotkey_translate_word)?;
         Self::set_setting("hotkey_translate_area", &settings.hotkey_translate_area)?;
         Self::set_setting("hotkey_translate_screen", &settings.hotkey_translate_screen)?;
+        Self::set_setting("hotkey_translate_clipboard", &settings.hotkey_translate_clipboard)?;
         Self::set_setting(
             "auto_save_words",
             if settings.auto_save_words {
@@ -480,7 +515,18 @@ impl Database {
                 "false"
             },
         )?;
-        Self::set_setting("is_pro", if settings.is_pro { "true" } else { "false" })?;
+        Self::set_setting("image_replacement", if settings.image_replacement { "true" } else { "false" })?;
+        // Новые настройки
+        Self::set_setting("auto_launch", if settings.auto_launch { "true" } else { "false" })?;
+        Self::set_setting("overlay_opacity", &settings.overlay_opacity.to_string())?;
+        Self::set_setting("font_size", &settings.font_size)?;
+        Self::set_setting("overlay_position", &settings.overlay_position)?;
+        Self::set_setting("auto_copy_translation", if settings.auto_copy_translation { "true" } else { "false" })?;
+        Self::set_setting("hide_after_translation", if settings.hide_after_translation { "true" } else { "false" })?;
+        Self::set_setting("overlay_duration", &settings.overlay_duration.to_string())?;
+        Self::set_setting("enable_sound", if settings.enable_sound { "true" } else { "false" })?;
+        Self::set_setting("show_word_context", if settings.show_word_context { "true" } else { "false" })?;
+        Self::set_setting("compact_mode", if settings.compact_mode { "true" } else { "false" })?;
         Ok(())
     }
 }

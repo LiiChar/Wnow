@@ -19,6 +19,7 @@ import type { TextBox } from '../../shared/types/ocr';
 import { BoxCanvas } from '../../components/box/BoxCanvas';
 import { FloatingTranslation  } from '../../components/overlay/FloatingTranslation';
 import { SelectionArea } from '../../components/overlay/SelectionArea';
+import { getSettings } from '@/shared/api/settings';
 
 export const TranslatorOverlay = () => {
 	const [isSelectFragment, setIsSelectFragment] = createSignal(false);
@@ -109,75 +110,6 @@ export const TranslatorOverlay = () => {
 					/>
 				</Show>
 
-				<Show when={showFullTranslation() && fullText()}>
-					<div
-						class={`fixed z-10002 ${
-							isCompactMode()
-								? 'bottom-4 right-4 max-w-xs'
-								: 'bottom-4 left-1/2 -translate-x-1/2 max-w-xl w-[90%]'
-						}`}
-						onClick={e => e.stopPropagation()}
-					>
-						<div class='glass-dark rounded-lg border border-neutral-700 shadow-2xl overflow-hidden'>
-							<Show when={isCompactMode()}>
-								<div class='p-3'>
-									<div class='flex justify-between mb-2'>
-										<span class='text-[10px] text-neutral-500'>Перевод</span>
-										<button onClick={() => setIsCompactMode(false)}>
-											<FoldVertical size={12} />
-										</button>
-									</div>
-
-									<p class='text-xs  line-clamp-4'>{fullText()}</p>
-
-									<div class='flex gap-1 mt-2'>
-										<button onClick={copyFullText}>
-											<Show fallback={<Copy size={12} />} when={fullCopied()}>
-												<Check size={12} />
-											</Show>
-										</button>
-
-										<button
-											onClick={() => {
-												setBoxes([]);
-												setFullText('');
-												setShowFullTranslation(false);
-											}}
-										>
-											<Trash size={12} />
-										</button>
-									</div>
-								</div>
-							</Show>
-
-							<Show when={!isCompactMode()}>
-								<div class='p-3'>
-									<p class='text-sm  whitespace-pre-wrap'>{fullText()}</p>
-								</div>
-
-								<div class='flex border-t border-neutral-800'>
-									<button class='flex-1 py-2' onClick={copyFullText}>
-										<Show fallback={<Copy size={12} />} when={fullCopied()}>
-											<Check size={12} />
-										</Show>
-									</button>
-
-									<button
-										class='flex-1 py-2 border-l border-neutral-800'
-										onClick={() => {
-											setBoxes([]);
-											setFullText('');
-											setShowFullTranslation(false);
-										}}
-									>
-										<Trash size={12} />
-									</button>
-								</div>
-							</Show>
-						</div>
-					</div>
-				</Show>
-
 				{isSelectFragment() && (
 					<SelectionArea
 						onCancel={() => setIsSelectFragment(false)}
@@ -185,16 +117,22 @@ export const TranslatorOverlay = () => {
 							setIsSelectFragment(false);
 
 							try {
-								const [text, resultBoxes] = await getBlockImageTranslate(
-									[rect.x, rect.y],
-									[rect.w, rect.h],
-								);
-								
-								// const [text, resultBoxes] = await getBlockTranslate(
-								// 	[rect.x, rect.y],
-								// 	[rect.w, rect.h],
-								// );
+								const settings = await getSettings();
 
+								let text;
+								let resultBoxes;
+
+								if (settings.image_replacement) {
+									[text, resultBoxes] = await getBlockImageTranslate(
+										[rect.x, rect.y],
+										[rect.w, rect.h],
+									);
+								} else {
+									[text, resultBoxes] = await getBlockTranslate(
+										[rect.x, rect.y],
+										[rect.w, rect.h],
+									);
+								}
 
 								log.info(
 									`[LAYOUT][EVENT][translate_fragment]Translate fragment with payload: text= ${  text  }, resultBoxes= ${  JSON.stringify(resultBoxes)}`,
@@ -210,7 +148,7 @@ export const TranslatorOverlay = () => {
 
 									setCursorEvents(false);
 								} else {
-									setFullText(prev => (prev ? `${prev}\n\n${text}` : text));
+									setFullText(text);
 
 									const adjusted = resultBoxes.map(b => ({
 										...b,
@@ -218,7 +156,7 @@ export const TranslatorOverlay = () => {
 										y: b.y + rect.y,
 									}));
 
-									setBoxes(prev => [...prev, ...adjusted]);
+									setBoxes(adjusted);
 									setShowFullTranslation(true);
 									setCursorEvents(true);
 								}

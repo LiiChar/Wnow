@@ -1,4 +1,5 @@
 import { render } from "solid-js/web"
+
 import Main from "./Main";
 
 const wrapper = document.getElementById('app');

@@ -1,24 +1,85 @@
+import { Bell, Copy, Eye, EyeOff, KeyRound, Languages, Layers, Monitor, Palette, Play, RotateCcw, Save, Sparkles, Volume2 } from 'lucide-solid';
 import { createSignal, onMount } from 'solid-js';
-import { HotkeyInput } from '../components/ui/HotkeyInput';
-import { settings, updateSettings, DEFAULT_SETTINGS } from '../shared/stores/settings';
-import { LANGUAGES } from '../shared/types/storage';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
-import { Switch, SwitchControl, SwitchThumb, SwitchLabel } from '@/components/ui/Switch';
-import { Languages, Monitor,Palette, Play, KeyRound, Bell, Save, RotateCcw, Sparkles } from 'lucide-solid';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select';
-import { useHeader } from '@/shared/hooks/useHeader';
-import { Button } from '@/components/ui/Button';
-import { createToast } from '@/components/ui/Toast';
+
 import { BottomPadding } from '@/components/layout/BottomPadding';
+import { Button } from '@/components/ui/Button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select';
+import { Switch, SwitchControl, SwitchLabel, SwitchThumb } from '@/components/ui/Switch';
+import { createToast } from '@/components/ui/Toast';
 import { getTranslationMode, setTranslationMode } from '@/shared/api/settings';
+import { useHeader } from '@/shared/hooks/useHeader';
 import { Models } from '@/widget/settings/Models';
+
+import { HotkeyInput } from '../components/ui/HotkeyInput';
+import { DEFAULT_SETTINGS, settingsStore, updateSettings } from '../shared/stores/settings';
+import { LANGUAGES } from '../shared/types/storage';
 
 interface SelectOption {
 	label: string;
 	value: string;
 }
 
-export function SettingsPage() {
+const Slider = (props: {
+	value: number;
+	min: number;
+	max: number;
+	step?: number;
+	onChange: (value: number) => void;
+	class?: string;
+}) => (
+		<input
+			class={`w-full h-2 bg-input rounded-lg appearance-none cursor-pointer accent-primary ${props.class || ''}`}
+			max={props.max}
+			min={props.min}
+			step={props.step || 1}
+			type='range'
+			value={props.value}
+			onInput={(e) => props.onChange(Number(e.currentTarget.value))}
+		/>
+	);
+
+interface SwitchRowProps {
+	checked: boolean;
+	description: string;
+	icon?: any;
+	title: string;
+	onChange: (value: boolean) => Promise<void> | void;
+}
+
+const SwitchRow = (props: SwitchRowProps) => {
+	const handleChange = (value: boolean) => {
+		// Выполняем onChange без ожидания Promise для избежания проблем с рендерингом
+		const result = props.onChange(value);
+		if (result && typeof result === 'object' && 'then' in result) {
+			// Promise, но не ждём его
+			result.catch((e: any) => console.error('Switch onChange error:', e));
+		}
+	};
+
+	return (
+		<div class='flex items-center justify-between'>
+			<div class='flex items-center gap-3 flex-1'>
+				{props.icon && (
+					<div class='p-1.5 rounded-md'>
+						<props.icon size={14} />
+					</div>
+				)}
+				<div>
+					<div class='text-sm font-medium'>{props.title}</div>
+					<div class='text-xs text-neutral-500'>{props.description}</div>
+				</div>
+			</div>
+			<Switch checked={props.checked} onChange={handleChange}>
+				<SwitchControl>
+					<SwitchThumb />
+				</SwitchControl>
+			</Switch>
+		</div>
+	);
+};
+
+export const SettingsPage = () => {
 	const [mode, setMode] = createSignal<string>('local_first');
 
 	useHeader('Настройки', 'Персонализация приложения');
@@ -41,10 +102,6 @@ export function SettingsPage() {
 		}
 	};
 
-	const startModeOptions: SelectOption[] = [
-		{ label: 'Приложение (словарь)', value: 'app' },
-		{ label: 'Режим перевода', value: 'overlay' }
-	];
 
 	const themeOptions: SelectOption[] = [
 		{ label: '🌙 Тёмная', value: 'dark' },
@@ -64,9 +121,9 @@ export function SettingsPage() {
 	}));
 
 	const handleResetSettings = async () => {
-		if (!confirm('Вы уверены, что хотите сбросить все настройки по умолчанию?')) {
-			return;
-		}
+		// if (!confirm('Вы уверены, что хотите сбросить все настройки по умолчанию?')) {
+		// 	return;
+		// }
 
 		try {
 			await updateSettings(DEFAULT_SETTINGS);
@@ -102,52 +159,20 @@ export function SettingsPage() {
 						</div>
 					</div>
 				</CardHeader>
-				<CardContent class='space-y-4'>
-					<div class='space-y-2'>
-						<label class='text-sm font-medium'>Режим запуска</label>
-						<Select
-							options={startModeOptions}
-							optionValue='value'
-							optionTextValue='label'
-							value={startModeOptions.find(
-								o => o.value === settings().start_mode,
-							)}
-							onChange={v =>
-								v &&
-								updateSettings({ start_mode: v.value as 'app' | 'overlay' })
-							}
-							itemComponent={props => (
-								<SelectItem item={props.item}>
-									{props.item.rawValue.label}
-								</SelectItem>
-							)}
-						>
-							<SelectTrigger>
-								<SelectValue<SelectOption>>
-									{state => state.selectedOption()?.label}
-								</SelectValue>
-							</SelectTrigger>
-							<SelectContent />
-						</Select>
-					</div>
-					<Switch
-						checked={settings().start_minimized}
-						onChange={v => updateSettings({ start_minimized: v })}
-					>
-						<SwitchLabel class='flex-1 cursor-pointer'>
-							<div class='flex items-center justify-between'>
-								<div>
-									<div class='text-sm font-medium'>Запускать свёрнутым</div>
-									<div class='text-xs text-neutral-500'>
-										Приложение будет запускаться в фоновом режиме
-									</div>
-								</div>
-								<SwitchControl>
-									<SwitchThumb />
-								</SwitchControl>
-							</div>
-						</SwitchLabel>
-					</Switch>
+				<CardContent class='space-y-3'>
+					<SwitchRow
+						checked={settingsStore.start_minimized}
+						description='Приложение будет запускаться в фоновом режиме'
+						title='Запускать свёрнутым'
+						onChange={(v) => updateSettings({ start_minimized: v })}
+					/>
+
+					<SwitchRow
+						checked={settingsStore.auto_launch}
+						description='Автоматически запускать приложение при старте системы'
+						title='Автозапуск'
+						onChange={(v) => updateSettings({ auto_launch: v })}
+					/>
 				</CardContent>
 			</Card>
 			{/* Внешний вид */}
@@ -169,30 +194,75 @@ export function SettingsPage() {
 					<div class='space-y-2'>
 						<label class='text-sm font-medium'>Тема</label>
 						<Select
-							options={themeOptions}
-							optionValue='value'
-							optionTextValue='label'
-							value={themeOptions.find(o => o.value === settings().theme)}
-							onChange={v =>
-								v &&
-								updateSettings({
-									theme: v.value as 'light' | 'dark' | 'system',
-								})
-							}
 							itemComponent={props => (
 								<SelectItem item={props.item}>
 									{props.item.rawValue.label}
 								</SelectItem>
 							)}
+							options={themeOptions}
+							optionTextValue='label'
+							optionValue='value'
+							value={themeOptions.find(o => o.value === settingsStore.theme)}
+							onChange={v =>
+								v &&
+								updateSettings({
+									theme: v.value as 'dark' | 'light' | 'system',
+								})
+							}
 						>
 							<SelectTrigger>
 								<SelectValue<SelectOption>>
-									{state => state.selectedOption()?.label}
+									{state => state.selectedOption().label}
 								</SelectValue>
 							</SelectTrigger>
 							<SelectContent />
 						</Select>
 					</div>
+					
+					<div class='space-y-2'>
+						<label class='text-sm font-medium'>Размер шрифта</label>
+						<Select
+							itemComponent={props => (
+								<SelectItem item={props.item}>
+									{props.item.rawValue.label}
+								</SelectItem>
+							)}
+							options={[
+								{ label: 'Маленький', value: 'small' },
+								{ label: 'Средний', value: 'medium' },
+								{ label: 'Большой', value: 'large' },
+							]}
+							optionValue='value'
+							value={{ label: '', value: settingsStore.font_size }}
+							onChange={v =>
+								v &&
+								updateSettings({
+									font_size: v.value,
+								})
+							}
+						>
+							<SelectTrigger>
+								<SelectValue<SelectOption>>
+									{state => {
+										const opt = [
+											{ label: 'Маленький', value: 'small' },
+											{ label: 'Средний', value: 'medium' },
+											{ label: 'Большой', value: 'large' },
+										].find(o => o.value === state.selectedOption().value);
+										return opt?.label || '';
+									}}
+								</SelectValue>
+							</SelectTrigger>
+							<SelectContent />
+						</Select>
+					</div>
+					
+					<SwitchRow
+						checked={settingsStore.compact_mode}
+						description='Уменьшить отступы и размеры элементов'
+						title='Компактный режим'
+						onChange={(v) => updateSettings({ compact_mode: v })}
+					/>
 				</CardContent>
 			</Card>
 			{/* Языки */}
@@ -214,20 +284,20 @@ export function SettingsPage() {
 					<div class='space-y-2'>
 						<label class='text-sm font-medium'>Исходный язык</label>
 						<Select
-							options={langOptions}
-							optionValue='value'
-							optionTextValue='label'
-							value={langOptions.find(o => o.value === settings().source_lang)}
-							onChange={v => v && updateSettings({ source_lang: v.value })}
 							itemComponent={props => (
 								<SelectItem item={props.item}>
 									{props.item.rawValue.label}
 								</SelectItem>
 							)}
+							options={langOptions}
+							optionTextValue='label'
+							optionValue='value'
+							value={langOptions.find(o => o.value === settingsStore.source_lang)}
+							onChange={v => v && updateSettings({ source_lang: v.value })}
 						>
 							<SelectTrigger>
 								<SelectValue<SelectOption>>
-									{state => state.selectedOption()?.label}
+									{state => state.selectedOption().label}
 								</SelectValue>
 							</SelectTrigger>
 							<SelectContent />
@@ -236,20 +306,20 @@ export function SettingsPage() {
 					<div class='space-y-2'>
 						<label class='text-sm font-medium'>Целевой язык</label>
 						<Select
-							options={langOptions}
-							optionValue='value'
-							optionTextValue='label'
-							value={langOptions.find(o => o.value === settings().target_lang)}
-							onChange={v => v && updateSettings({ target_lang: v.value })}
 							itemComponent={props => (
 								<SelectItem item={props.item}>
 									{props.item.rawValue.label}
 								</SelectItem>
 							)}
+							options={langOptions}
+							optionTextValue='label'
+							optionValue='value'
+							value={langOptions.find(o => o.value === settingsStore.target_lang)}
+							onChange={v => v && updateSettings({ target_lang: v.value })}
 						>
 							<SelectTrigger>
 								<SelectValue<SelectOption>>
-									{state => state.selectedOption()?.label}
+									{state => state.selectedOption().label}
 								</SelectValue>
 							</SelectTrigger>
 							<SelectContent />
@@ -275,25 +345,31 @@ export function SettingsPage() {
 					</div>
 				</CardHeader>
 				<CardContent class='space-y-4'>
+					<SwitchRow
+						checked={settingsStore.image_replacement}
+						description='Заменять изначальный текст на переведённый'
+						title='Заменять текст'
+						onChange={(v) => updateSettings({ image_replacement: v })}
+					/>
 					<div class='space-y-2'>
 						<label class='text-sm font-medium'>Режим перевода</label>
 						<Select
-							options={translationModeOptions}
-							optionValue='value'
-							optionTextValue='label'
-							value={translationModeOptions.find(
-								o => o.value === mode(),
-							)}
-							onChange={v => v && handleTranslationModeChange(v.value)}
 							itemComponent={props => (
 								<SelectItem item={props.item}>
 									{props.item.rawValue.label}
 								</SelectItem>
 							)}
+							value={translationModeOptions.find(
+								o => o.value === mode(),
+							)}
+							options={translationModeOptions}
+							optionTextValue='label'
+							optionValue='value'
+							onChange={v => v && handleTranslationModeChange(v.value)}
 						>
 							<SelectTrigger>
 								<SelectValue<SelectOption>>
-									{state => state.selectedOption()?.label}
+									{state => state.selectedOption().label}
 								</SelectValue>
 							</SelectTrigger>
 							<SelectContent />
@@ -315,7 +391,7 @@ export function SettingsPage() {
 					</div>
 					<div class='p-3  border border-emerald-800/50 rounded-lg'>
 						<div class='flex items-start gap-2'>
-							<Sparkles size={40} class='text-emerald-400 -mt-2' />
+							<Sparkles class='text-emerald-400 -mt-2' size={40} />
 							<div>
 								<div class='text-xs text-emerald-400 font-medium mb-0.5'>
 									Рекомендация
@@ -349,7 +425,7 @@ export function SettingsPage() {
 						<div class='flex-1'>
 							<HotkeyInput
 								label='Перевод слова под курсором'
-								value={settings().hotkey_translate_word}
+								value={settingsStore.hotkey_translate_word}
 								onChange={v => updateSettings({ hotkey_translate_word: v })}
 							/>
 						</div>
@@ -359,7 +435,7 @@ export function SettingsPage() {
 						<div class='flex-1'>
 							<HotkeyInput
 								label='Выделить область'
-								value={settings().hotkey_translate_area}
+								value={settingsStore.hotkey_translate_area}
 								onChange={v => updateSettings({ hotkey_translate_area: v })}
 							/>
 						</div>
@@ -369,7 +445,7 @@ export function SettingsPage() {
 						<div class='flex-1'>
 							<HotkeyInput
 								label='Перевод всего экрана'
-								value={settings().hotkey_translate_screen}
+								value={settingsStore.hotkey_translate_screen}
 								onChange={v => updateSettings({ hotkey_translate_screen: v })}
 							/>
 						</div>
@@ -379,7 +455,7 @@ export function SettingsPage() {
 						<div class='flex-1'>
 							<HotkeyInput
 								label='Перевод выделенного текста'
-								value={settings().hotkey_translate_clipboard}
+								value={settingsStore.hotkey_translate_clipboard}
 								onChange={v =>
 									updateSettings({ hotkey_translate_clipboard: v })
 								}
@@ -409,81 +485,153 @@ export function SettingsPage() {
 					</div>
 				</CardHeader>
 				<CardContent class='space-y-3'>
-					<Switch
-						checked={settings().auto_save_words}
-						onChange={v => updateSettings({ auto_save_words: v })}
-					>
-						<SwitchLabel class='flex-1 cursor-pointer'>
-							<div class='flex items-center justify-between'>
-								<div class='flex items-center gap-3'>
-									<div class='p-1.5 rounded-md '>
-										<Save size={14} />
-									</div>
-									<div>
-										<div class='text-sm font-medium'>Автосохранение слов</div>
-										<div class='text-xs text-neutral-500'>
-											Автоматически сохранять переведённые слова в словарь
-										</div>
-									</div>
-								</div>
-								<SwitchControl>
-									<SwitchThumb />
-								</SwitchControl>
-							</div>
-						</SwitchLabel>
-					</Switch>
+					<SwitchRow
+						checked={settingsStore.auto_save_words}
+						description='Автоматически сохранять переведённые слова в словарь'
+						icon={Save}
+						title='Автосохранение слов'
+						onChange={(v) => updateSettings({ auto_save_words: v })}
+					/>
 
-					<Switch
-						checked={settings().show_notifications}
-						onChange={v => updateSettings({ show_notifications: v })}
-					>
-						<SwitchLabel class='flex-1 cursor-pointer'>
-							<div class='flex items-center justify-between'>
-								<div class='flex items-center gap-3'>
-									<div class='p-1.5 rounded-md '>
-										<Bell size={14} />
-									</div>
-									<div>
-										<div class='text-sm font-medium'>Уведомления</div>
-										<div class='text-xs text-neutral-500'>
-											Показывать уведомления о событиях
-										</div>
-									</div>
-								</div>
-								<SwitchControl>
-									<SwitchThumb />
-								</SwitchControl>
-							</div>
-						</SwitchLabel>
-					</Switch>
+					<SwitchRow
+						checked={settingsStore.show_notifications}
+						description='Показывать уведомления о событиях'
+						icon={Bell}
+						title='Уведомления'
+						onChange={(v) => updateSettings({ show_notifications: v })}
+					/>
 
-					<Switch
-						checked={settings().minimize_to_tray}
-						onChange={v => updateSettings({ minimize_to_tray: v })}
-					>
-						<SwitchLabel class='flex-1 cursor-pointer'>
-							<div class='flex items-center justify-between'>
-								<div class='flex items-center gap-3'>
-									<div class='p-1.5 rounded-md '>
-										<Monitor size={14} />
-									</div>
-									<div>
-										<div class='text-sm font-medium'>Сворачивать в трей</div>
-										<div class='text-xs text-neutral-500'>
-											Скрывать приложение в системный трей при сворачивании
-										</div>
-									</div>
-								</div>
-								<SwitchControl>
-									<SwitchThumb />
-								</SwitchControl>
-							</div>
-						</SwitchLabel>
-					</Switch>
+					<SwitchRow
+						checked={settingsStore.minimize_to_tray}
+						description='Скрывать приложение в системный трей при сворачивании'
+						icon={Monitor}
+						title='Сворачивать в трей'
+						onChange={(v) => updateSettings({ minimize_to_tray: v })}
+					/>
+
+					<SwitchRow
+						checked={settingsStore.show_word_context}
+						description='Отображать контекст предложения для слов'
+						icon={Eye}
+						title='Показывать контекст'
+						onChange={(v) => updateSettings({ show_word_context: v })}
+					/>
+				</CardContent>
+			</Card>
+			
+			{/* Overlay */}
+			<Card>
+				<CardHeader>
+					<div class='flex items-center gap-2'>
+						<div class='p-1.5 rounded-lg bg-blue-500/10 text-blue-400 shrink-0'>
+							<Layers size={16} />
+						</div>
+						<div class='min-w-0'>
+							<CardTitle class='text-base'>Overlay (перевод)</CardTitle>
+							<CardDescription class='text-xs'>
+								Настройки отображения перевода
+							</CardDescription>
+						</div>
+					</div>
+				</CardHeader>
+				<CardContent class='space-y-4'>
+					<div class='space-y-2'>
+						<div class='flex items-center justify-between'>
+							<label class='text-sm font-medium'>Прозрачность фона</label>
+							<span class='text-xs text-neutral-500'>{settingsStore.overlay_opacity}%</span>
+						</div>
+						<Slider
+							max={100}
+							min={50}
+							step={5}
+							value={settingsStore.overlay_opacity}
+							onChange={(v) => updateSettings({ overlay_opacity: v })}
+						/>
+					</div>
+					
+					<div class='space-y-2'>
+						<label class='text-sm font-medium'>Позиция overlay</label>
+						<Select
+							itemComponent={props => (
+								<SelectItem item={props.item}>
+									{props.item.rawValue.label}
+								</SelectItem>
+							)}
+							options={[
+								{ label: '⬆️ Сверху', value: 'top' },
+								{ label: '⬇️ Снизу', value: 'bottom' },
+								{ label: '↕️ По центру', value: 'center' },
+							]}
+							optionValue='value'
+							value={{ label: '', value: settingsStore.overlay_position }}
+							onChange={v =>
+								v &&
+								updateSettings({
+									overlay_position: v.value,
+								})
+							}
+						>
+							<SelectTrigger>
+								<SelectValue<SelectOption>>
+									{state => {
+										const opt = [
+											{ label: '⬆️ Сверху', value: 'top' },
+											{ label: '⬇️ Снизу', value: 'bottom' },
+											{ label: '↕️ По центру', value: 'center' },
+										].find(o => o.value === state.selectedOption().value);
+										return opt?.label || '';
+									}}
+								</SelectValue>
+							</SelectTrigger>
+							<SelectContent />
+						</Select>
+					</div>
+					
+					<div class='space-y-2'>
+						<div class='flex items-center justify-between'>
+							<label class='text-sm font-medium'>Время показа (мс)</label>
+							<span class='text-xs text-neutral-500'>{settingsStore.overlay_duration} мс</span>
+						</div>
+						<Slider
+							max={30000}
+							min={1000}
+							step={500}
+							value={settingsStore.overlay_duration}
+							onChange={(v) => updateSettings({ overlay_duration: v })}
+						/>
+						<div class='flex justify-between text-xs text-neutral-500'>
+							<span>1 сек</span>
+							<span>30 сек</span>
+						</div>
+					</div>
+					
+					<SwitchRow
+						checked={settingsStore.auto_copy_translation}
+						description='Копировать перевод в буфер обмена'
+						icon={Copy}
+						title='Автокопирование'
+						onChange={(v) => updateSettings({ auto_copy_translation: v })}
+					/>
+
+					<SwitchRow
+						checked={settingsStore.hide_after_translation}
+						description='Автоматически скрывать overlay после показа'
+						icon={EyeOff}
+						title='Скрывать после показа'
+						onChange={(v) => updateSettings({ hide_after_translation: v })}
+					/>
+
+					<SwitchRow
+						checked={settingsStore.enable_sound}
+						description='Воспроизводить звук при показе перевода'
+						icon={Volume2}
+						title='Звуковые эффекты'
+						onChange={(v) => updateSettings({ enable_sound: v })}
+					/>
 				</CardContent>
 			</Card>
 			{/* Сброс настроек */}
-			<Button variant='outline' onClick={handleResetSettings} class='w-full'>
+			<Button class='w-full' variant='outline' onClick={handleResetSettings}>
 				<RotateCcw size={16} />
 				Сбросить настройки по умолчанию
 			</Button>

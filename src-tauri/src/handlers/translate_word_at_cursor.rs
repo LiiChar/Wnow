@@ -2,6 +2,7 @@ use crate::capture::Capture;
 use crate::mouse::Mouse;
 use crate::ocr::{preprocess_for_tesseract_sys, recognize_with_boxes, OcrWord};
 use crate::platform::set_window_topmost;
+use crate::translation::local::get_translate_lang;
 use crate::translation::translate;
 use crate::utils::fnv1a_hash;
 use std::time::Instant;
@@ -159,6 +160,8 @@ pub async fn translate_word_at_cursor(app: &AppHandle) {
         return;
     }
 
+    let (source_lang, target_lang) = get_translate_lang();
+
     if let Some(word_box) = word {
         let word_text = word_box.text.trim().to_string();
         log!(
@@ -170,7 +173,7 @@ pub async fn translate_word_at_cursor(app: &AppHandle) {
         );
 
         // Переводим слово
-        let translation = match translate(word_text.clone(), "en", "ru").await {
+        let translation = match translate(word_text.clone(), &source_lang, &target_lang).await {
             Ok(t) => t,
             Err(e) => {
                 log!(Level::Error, "Translation error: {:?}", e);

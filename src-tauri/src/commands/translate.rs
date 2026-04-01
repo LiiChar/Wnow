@@ -1,6 +1,9 @@
 use crate::capture::Capture;
+use crate::commands::database::get_settings;
 use crate::img::{TextReplacementParams, ocr_word_to_translated_box, replace_text_in_image};
-use crate::{get_resource_dir};
+use crate::storage::Database;
+use crate::translation::local::get_translate_lang;
+use crate::{get_resource_dir, source};
 use crate::ocr::{postprocess_ocr, preprocess_for_tesseract_sys, recognize_with_boxes, OcrWord};
 use crate::translation::translate as t;
 use crate::utils::fnv1a_hash;
@@ -29,6 +32,8 @@ pub fn get_block_translate(
     let phys_w = (size.0 as f32 * scale) as i32;
     let phys_h = (size.1 as f32 * scale) as i32;
 
+    let (source_lang, target_lang) = get_translate_lang();
+
     let mut capture = Capture::new();
 
     let (text, clear_boxes) = box_ocr(&mut capture, phys_x, phys_y, phys_w, phys_h, scale)?;
@@ -44,7 +49,7 @@ pub fn get_block_translate(
 
     // 👇 блокируем async внутри sync функции
     let results = tauri::async_runtime::block_on(join_all(
-        requests.into_iter().map(|text| t(text, "en", "ru")),
+        requests.into_iter().map(|text| t(text, &source_lang, &target_lang)),
     ));
 
     let mut translated_text = text.clone();
@@ -176,11 +181,12 @@ pub async fn start_floating_image_translate(
         return Ok(());
     }
 
+    let delay = Database::get_setting("floating_delay").unwrap_or("1000".to_string()).parse::<i32>().unwrap_or(1000);
+
+    let (source_lang, target_lang) = get_translate_lang();
+
     FLOATING_TRANSLATE_RUNNING.store(true, Ordering::Relaxed);
     let running = FLOATING_TRANSLATE_RUNNING.clone();
-
-    let mut capture = Capture::new();
-    let (phys_w, phys_h) = capture.get_capture_size();
 
     tauri::async_runtime::spawn_blocking(move || {
         let scale = webview_window.scale_factor().unwrap_or(1.0) as f32;
@@ -208,9 +214,8 @@ pub async fn start_floating_image_translate(
                 let mut requests = vec![text.clone()];
                 requests.extend(clear_boxes.iter().map(|b| b.text.clone()));
 
-                // ⚠️ тут блокирующий runtime
                 let results = tauri::async_runtime::block_on(join_all(
-                    requests.into_iter().map(|text| t(text, "en", "ru")),
+                    requests.into_iter().map(|text| t(text, &source_lang, &target_lang)),
                 ));
 
                 let mut translated_text = text.clone();
@@ -313,7 +318,7 @@ pub async fn start_floating_image_translate(
             }
 
             // ⏱ задержка
-            std::thread::sleep(std::time::Duration::from_secs(2));
+            std::thread::sleep(std::time::Duration::from_micros(delay as u64));
 
             println!("tick {}ms", start.elapsed().as_millis());
         }
@@ -331,6 +336,8 @@ pub async fn start_floating_translate(
     if FLOATING_TRANSLATE_RUNNING.load(Ordering::Relaxed) {
         return Ok(());
     }
+
+    let (source_lang, target_lang) = get_translate_lang();
 
     FLOATING_TRANSLATE_RUNNING.store(true, Ordering::Relaxed);
     let running = FLOATING_TRANSLATE_RUNNING.clone();
@@ -363,7 +370,7 @@ pub async fn start_floating_translate(
 
                 // ⚠️ тут блокирующий runtime
                 let results = tauri::async_runtime::block_on(join_all(
-                    requests.into_iter().map(|text| t(text, "en", "ru")),
+                    requests.into_iter().map(|text| t(text, &source_lang, &target_lang)),
                 ));
 
                 let mut translated_text = text.clone();
@@ -397,7 +404,7 @@ pub async fn start_floating_translate(
             }
 
             // ⏱ задержка
-            std::thread::sleep(std::time::Duration::from_secs(2));
+            std::thread::sleep(std::time::Duration::from_micros(200));
 
             println!("tick {}ms", start.elapsed().as_millis());
         }
@@ -433,7 +440,7 @@ pub fn box_ocr(
                 buffer.clone(), // можно оставить только в debug
             ) {
                 let _ = debug_img.save(
-                    get_resource_dir().join(format!("debug_{}.png", fnv1a_hash(text.as_bytes()))),
+                    get_resource_dir().join("screenshot").join(format!("debug_{}.png", fnv1a_hash(text.as_bytes()))),
                 );
             }
         }

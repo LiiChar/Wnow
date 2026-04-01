@@ -1,4 +1,4 @@
-use crate::mouse::Mouse;
+use crate::{mouse::Mouse, translation::local::get_translate_lang};
 use crate::ocr::OcrWord;
 use crate::platform::set_window_topmost;
 use crate::translation::translate;
@@ -13,6 +13,8 @@ use tauri_plugin_log::log::{log, Level};
 /// Перевод выделенного текста (без изменения буфера обмена пользователя)
 pub async fn translate_selected_text(app: &AppHandle) {
     let clipboard = app.clipboard();
+
+    let (source_lang, target_lang) = get_translate_lang();
 
     // 1. Сохраняем оригинальное содержимое буфера обмена
     let original_clipboard = clipboard.read_text().ok();
@@ -78,7 +80,7 @@ pub async fn translate_selected_text(app: &AppHandle) {
     );
 
     // 6. Переводим текст
-    let translation = match translate(text.to_string(), "en", "ru").await {
+    let translation = match translate(text.to_string(), &source_lang, &target_lang).await {
         Ok(t) => t,
         Err(e) => {
             log!(Level::Error, "Translation error: {:?}", e);

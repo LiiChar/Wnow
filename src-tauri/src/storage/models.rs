@@ -22,7 +22,6 @@ pub struct SavedWord {
     pub repetitions: i32,
 }
 
-/// Статистика изучения
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct LearningStats {
     pub total_words: i32,
@@ -34,21 +33,32 @@ pub struct LearningStats {
     pub last_study_date: Option<i64>,
 }
 
-/// Настройки приложения
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
-    pub theme: String, // "light", "dark", "system"
+    pub theme: String,
+    pub image_replacement: bool,
     pub source_lang: String,
     pub target_lang: String,
     pub hotkey_translate_word: String,
     pub hotkey_translate_area: String,
     pub hotkey_translate_screen: String,
+    pub hotkey_translate_clipboard: String,
     pub auto_save_words: bool,
     pub show_notifications: bool,
     pub minimize_to_tray: bool,
     pub start_minimized: bool,
-    pub is_pro: bool,
-    pub pro_expires: Option<i64>,
+    // Новые настройки
+    pub auto_launch: bool,
+    pub overlay_opacity: i32,
+    pub font_size: String,
+    pub overlay_position: String,
+    pub auto_copy_translation: bool,
+    pub hide_after_translation: bool,
+    pub overlay_duration: i32,
+    pub floating_delay: i32,
+    pub enable_sound: bool,
+    pub show_word_context: bool,
+    pub compact_mode: bool,
 }
 
 impl Default for AppSettings {
@@ -60,12 +70,24 @@ impl Default for AppSettings {
             hotkey_translate_word: "Ctrl+U".to_string(),
             hotkey_translate_area: "Ctrl+Y".to_string(),
             hotkey_translate_screen: "Ctrl+T".to_string(),
+            hotkey_translate_clipboard: "Ctrl+Shift+C".to_string(),
+            image_replacement: false,
             auto_save_words: false,
             show_notifications: true,
             minimize_to_tray: true,
             start_minimized: false,
-            is_pro: false,
-            pro_expires: None,
+            // Новые настройки по умолчанию
+            auto_launch: false,
+            overlay_opacity: 95,
+            font_size: "medium".to_string(),
+            overlay_position: "top".to_string(),
+            auto_copy_translation: false,
+            hide_after_translation: false,
+            overlay_duration: 5000,
+            floating_delay: 1000,
+            enable_sound: false,
+            show_word_context: true,
+            compact_mode: false,
         }
     }
 }
