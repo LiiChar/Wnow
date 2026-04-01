@@ -99,6 +99,7 @@ fn try_merge_sequence(words: &[OcrWord]) -> Option<OcrWord> {
             w: (last.x + last.w) - first.x,
             h: first.h,
             translation: None,
+            image: None
         });
     }
 
@@ -191,6 +192,7 @@ fn build_sentences(lines: Vec<Vec<OcrWord>>) -> Vec<OcrWord> {
             w: (last.x + last.w) - first.x,
             h: first.h,
             translation: None,
+            image: None
         });
     }
 

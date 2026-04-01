@@ -7,7 +7,8 @@
       "Bash(npm run *)",
       "Bash(cargo check)",
       "Bash(mkdir *)",
-      "Bash(select-string *)"
+      "Bash(select-string *)",
+      "Bash(findstr *)"
     ]
   },
   "$version": 3

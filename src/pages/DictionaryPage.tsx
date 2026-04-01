@@ -1,20 +1,22 @@
-import { createSignal, For, Show, onMount } from 'solid-js';
-import type { SavedWord } from '../shared/types/storage';
-import { Input } from '@/components/ui/Input';
-import { Card, CardContent } from '@/components/ui/Card';
 import { BookMarked, Trash, X } from 'lucide-solid';
-import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
-import { useHeader } from '@/shared/hooks/useHeader';
-import { setLayoutStore } from '@/shared/stores/layout';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog';
+import { createSignal, For, onMount, Show } from 'solid-js';
+
 import { Alert } from '@/components/dialog/Alert';
 import { BottomPadding } from '@/components/layout/BottomPadding';
-import { Translate } from '@/widget/translate/Translate';
-import { getAllWords } from '@/shared/api/stude';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Card, CardContent } from '@/components/ui/Card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog';
+import { Input } from '@/components/ui/Input';
 import { showNotification } from '@/shared/api/notification';
+import { getAllWords } from '@/shared/api/stude';
+import { useHeader } from '@/shared/hooks/useHeader';
+import { setLayoutStore } from '@/shared/stores/layout';
+import { Translate } from '@/widget/translate/Translate';
 
-export function DictionaryPage() {
+import type { SavedWord } from '../shared/types/storage';
+
+export const DictionaryPage = () => {
   const [words, setWords] = createSignal<SavedWord[]>([]);
   const [search, setSearch] = createSignal('');
   const [loading, setLoading] = createSignal(true);
@@ -73,29 +75,28 @@ export function DictionaryPage() {
 				await showNotification({
 					title: 'Уведомление',
 					text: 'Это уведомление',
-					duration: 2000,
+					duration: 50000,
 				})
 			}}>
 				Уведомления
 			</Button>
 			<Input
+				class='h-10! max-h-max'
 				placeholder='Поиск...'
 				value={search()}
 				onInput={e => setSearch(e.currentTarget.value)}
-				class='h-10! max-h-max'
 			/>
 
 			<div class='flex-1'>
 				<Show
-					when={!loading()}
 					fallback={
 						<div class='flex items-center justify-center h-32'>
 							<div class='w-6 h-6 border-2 border-border border-t-transparent rounded-full animate-spin' />
 						</div>
 					}
+					when={!loading()}
 				>
 					<Show
-						when={filteredWords().length > 0}
 						fallback={
 							<Card class='text-center'>
 								<CardContent>
@@ -109,6 +110,7 @@ export function DictionaryPage() {
 								</CardContent>
 							</Card>
 						}
+						when={filteredWords().length > 0}
 					>
 						<div class='space-y-2'>
 							<For each={filteredWords()}>
@@ -184,11 +186,12 @@ export function DictionaryPage() {
 							<div class='text-xs text-neutral-500'>Уровень</div>
 						</div>
 						<Show when={selectedWord()?.screenshot_path}>
-							{path => <img src={path()} alt='' />}
+							{path => <img alt='' src={path()} />}
 						</Show>
 					</div>
 					<DialogFooter>
 						<Alert
+							title='Вы уверены?'
 							onConfirm={() => {
 								const word = selectedWord();
 								if (!word) return;
@@ -196,9 +199,8 @@ export function DictionaryPage() {
 								deleteWord(word.id);
 								setOpen(false);
 							}}
-							title='Вы уверены?'
 						>
-							<Button variant='destructive' class='gap-1.5'>
+							<Button class='gap-1.5' variant='destructive'>
 								<Trash size={16} />
 								Удалить
 							</Button>

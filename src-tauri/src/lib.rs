@@ -3,6 +3,7 @@ mod commands;
 mod handlers;
 mod img;
 mod mouse;
+mod notification;
 mod ocr;
 mod platform;
 mod setup;
@@ -59,18 +60,18 @@ pub fn run() {
                             _ => {}
                         }
                     }
-                    if shortcut == &ctrl_t {
-                        match event.state() {
-                            ShortcutState::Released => {
-                                let app_clone = app.clone();
-                                std::thread::spawn(move || {
-                                    let rt = tokio::runtime::Runtime::new().unwrap();
-                                    rt.block_on(show_translate_with_replacement(&app_clone));
-                                });
-                            }
-                            _ => {}
-                        }
-                    }
+                    // if shortcut == &ctrl_t {
+                    //     match event.state() {
+                    //         ShortcutState::Released => {
+                    //             let app_clone = app.clone();
+                    //             std::thread::spawn(move || {
+                    //                 let rt = tokio::runtime::Runtime::new().unwrap();
+                    //                 rt.block_on(show_translate_with_replacement(&app_clone));
+                    //             });
+                    //         }
+                    //         _ => {}
+                    //     }
+                    // }
                     if shortcut == &ctrl_u {
                         match event.state() {
                             ShortcutState::Released => {
@@ -119,6 +120,8 @@ pub fn run() {
             commands::model::download_model,
             commands::model::get_model_list,
             commands::model::get_available_models,
+            commands::monitor::get_monitors,
+            commands::monitor::get_main_monitor,
             commands::database::add_word_to_study,
             commands::database::get_all_words,
             commands::database::get_words_for_study,
@@ -129,8 +132,10 @@ pub fn run() {
             commands::database::save_settings,
             commands::translate::translate,
             commands::translate::get_block_translate,
+            commands::translate::get_block_image_translate,
             commands::translate::stop_floating_translate,
             commands::translate::start_floating_translate,
+            commands::translate::start_floating_image_translate,
             commands::translation::set_translation_mode,
             commands::translation::get_current_translation_mode,
             commands::translation::get_translation_models,
@@ -147,6 +152,7 @@ pub fn run() {
 
             setup::setup_overlay_window(&app.handle());
             setup::setup_main_window(&app.handle());
+            setup::setup_notification_window(&app.handle());
 
             setup::setup_tray(&app.handle())?;
 

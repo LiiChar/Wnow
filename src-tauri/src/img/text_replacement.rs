@@ -35,17 +35,20 @@ pub struct TextReplacementParams {
     pub max_font_size: f32,
     /// Шаг подбора размера шрифта
     pub font_size_step: f32,
+    /// Множитель межбуквенного интервала (1.0 = стандартный кернинг)
+    pub letter_spacing: f32,
 }
 
 impl Default for TextReplacementParams {
     fn default() -> Self {
         Self {
             mask_padding: 3,
-            text_padding: 4,
+            text_padding: 6,
             overlay_alpha: 0.3,
             min_font_size: 8.0,
             max_font_size: 72.0,
             font_size_step: 0.5,
+            letter_spacing: 1.15,
         }
     }
 }
@@ -171,18 +174,30 @@ fn process_single_box(
     params: &TextReplacementParams,
 ) -> Result<f32, String> {
     let (img_width, img_height) = image.dimensions();
+    let padding = params.mask_padding as i32;
 
     // Вычисляем координаты с паддингом
-    let x_start = box_item.x.saturating_sub(params.mask_padding as i32) as u32;
-    let y_start = box_item.y.saturating_sub(params.mask_padding as i32) as u32;
-    let x_end = ((box_item.x + box_item.width + params.mask_padding as i32) as u32).min(img_width);
-    let y_end =
-        ((box_item.y + box_item.height + params.mask_padding as i32) as u32).min(img_height);
+    let x_start_i = (box_item.x - padding).max(0);
+    let y_start_i = (box_item.y - padding).max(0);
 
-    let box_x = x_start;
-    let box_y = y_start;
-    let box_w = x_end - x_start;
-    let box_h = y_end - y_start;
+    let x_end_i = (box_item.x + box_item.width + padding)
+        .min(img_width as i32)
+        .max(0);
+
+    let y_end_i = (box_item.y + box_item.height + padding)
+        .min(img_height as i32)
+        .max(0);
+
+    // 🔥 критическая проверка
+    if x_end_i <= x_start_i || y_end_i <= y_start_i {
+        return Err("Invalid box after bounds clamp".into());
+    }
+
+    // теперь можно безопасно
+    let box_x = x_start_i as u32;
+    let box_y = y_start_i as u32;
+    let box_w = (x_end_i - x_start_i) as u32;
+    let box_h = (y_end_i - y_start_i) as u32;
 
     if box_w == 0 || box_h == 0 {
         return Ok(0.0);
@@ -223,13 +238,14 @@ fn process_single_box(
     draw_text_on_image(
         image,
         &box_item.translated_text,
-        box_item.x as f32,
-        box_item.y as f32,
-        box_item.width as u32,
-        box_item.height as u32,
+        box_item.x as f32 + params.text_padding as f32,
+        box_item.y as f32 + params.text_padding as f32,
+        (box_item.width as i32 - 2 * params.text_padding as i32) as u32,
+        (box_item.height as i32 - 2 * params.text_padding as i32) as u32,
         font,
         font_size,
         text_color,
+        params.letter_spacing,
     );
 
     Ok(font_size)
@@ -500,6 +516,11 @@ fn calculate_optimal_font_size(
         return params.min_font_size;
     }
 
+    // Коэффициент безопасности для учёта неточностей rasterization
+    let safety_factor = 0.85;
+    let safe_width = available_width as f32 * safety_factor;
+    let safe_height = available_height as f32 * safety_factor;
+
     let mut low = params.min_font_size;
     let mut high = params.max_font_size.min(available_height as f32);
     let mut best_size = params.min_font_size;
@@ -514,15 +535,15 @@ fn calculate_optimal_font_size(
         for c in text.chars() {
             let glyph = font.glyph(c).scaled(scale);
             if let Some(rect) = glyph.exact_bounding_box() {
-                text_width += rect.width() as f32;
+                text_width += rect.width() as f32 * params.letter_spacing;
                 max_glyph_height = max_glyph_height.max(rect.height() as f32);
             } else {
                 // Для пробелов
-                text_width += mid * 0.3;
+                text_width += mid * 0.3 * params.letter_spacing;
             }
         }
 
-        if text_width <= available_width as f32 && max_glyph_height <= available_height as f32 {
+        if text_width <= safe_width && max_glyph_height <= safe_height {
             best_size = mid;
             low = mid + params.font_size_step;
         } else {
@@ -548,10 +569,11 @@ fn draw_text_on_image(
     font: &Font,
     font_size: f32,
     color: Rgba<u8>,
+    letter_spacing: f32,
 ) {
     let scale = Scale::uniform(font_size);
 
-    // Вычисляем размеры текста для центрирования
+    // Вычисляем размеры текста для позиционирования
     let mut text_width = 0f32;
     let mut max_glyph_height = 0f32;
 
@@ -563,8 +585,8 @@ fn draw_text_on_image(
         }
     }
 
-    // Центрируем текст
-    let start_x = x + (width as f32 - text_width) / 2.0;
+    // Позиционируем текст слева с вертикальным центрированием
+    let start_x = x;
     let start_y = y + (height as f32 - max_glyph_height) / 2.0 + max_glyph_height;
 
     let mut caret_x = start_x;
@@ -589,9 +611,9 @@ fn draw_text_on_image(
                     image.put_pixel(px, py, blended);
                 }
             });
-            caret_x += rect.width() as f32 * 0.8;
+            caret_x += rect.width() as f32 * letter_spacing;
         } else {
-            caret_x += font_size * 0.3;
+            caret_x += font_size * letter_spacing * 0.3;
         }
     }
 }

@@ -4,26 +4,19 @@ pub fn preprocess_for_tesseract_sys(
     height: u32,
     contrast: f32,
 ) -> Vec<u8> {
-    let len = (width * height) as usize;
-    let mut gray = vec![0u8; len];
-
-    // contrast: [-255..255] обычно
     let factor = (259.0 * (contrast + 255.0)) / (255.0 * (259.0 - contrast));
+    
+    let mut gray = Vec::with_capacity(pixels.len() / 4);
 
-    for i in 0..len {
-        let idx = i * 4;
+    for chunk in pixels.chunks_exact(4) {
+        let r = chunk[0] as f32;
+        let g = chunk[1] as f32;
+        let b = chunk[2] as f32;
 
-        let r = pixels[idx] as f32;
-        let g = pixels[idx + 1] as f32;
-        let b = pixels[idx + 2] as f32;
-
-        // luminance
         let lum = 0.299 * r + 0.587 * g + 0.114 * b;
-
-        // contrast
         let val = factor * (lum - 128.0) + 128.0;
 
-        gray[i] = val.clamp(0.0, 255.0) as u8;
+        gray.push(val.clamp(0.0, 255.0) as u8);
     }
 
     gray

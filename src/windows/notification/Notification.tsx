@@ -1,10 +1,12 @@
 import { onMount } from 'solid-js';
-import '../../assets/style/index.css';
 
-import { initSettings, applyTheme } from '../../shared/stores/settings';
 import { Notification as Not } from '@/widget/notification/Notification';
 
-function Notification() {
+import { applyTheme, initSettings } from '../../shared/stores/settings';
+
+import '../../assets/style/index.css';
+
+const Notification = () => {
 
 
   onMount(() => {

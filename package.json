@@ -13,6 +13,7 @@
   "license": "MIT",
   "dependencies": {
     "@kobalte/core": "^0.13.11",
+    "@siberiacancode/eslint": "^2.16.12",
     "@solidjs/router": "^0.16.1",
     "@tailwindcss/typography": "^0.5.19",
     "@tailwindcss/vite": "^4.1.18",

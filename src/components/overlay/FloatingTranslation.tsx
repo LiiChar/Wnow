@@ -1,30 +1,33 @@
-import { getBlockTranslate, startFloatingTranslate } from '@/shared/api/translate';
-import { TextBox } from '@/shared/types/ocr';
-import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
-import { createSignal, onMount, onCleanup, createEffect, For, Show } from 'solid-js';
-import fitty from 'fitty';
-import { log } from '@/shared/lib/log';
 import { listen } from '@tauri-apps/api/event';
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import concaveman from 'concaveman';
+import fitty from 'fitty';
 import roundPolygon, { getSegments } from 'round-polygon';
-import { groupBoxes, GroupedBox } from '@/shared/lib/points';
+import { createEffect, createSignal, For, onCleanup, onMount, Show } from 'solid-js';
 
-export type Area = {
+import type { GroupedBox } from '@/shared/lib/points';
+import type { TextBox } from '@/shared/types/ocr';
+
+import { getBlockTranslate, startFloatingImageTranslate, startFloatingTranslate } from '@/shared/api/translate';
+import { log } from '@/shared/lib/log';
+import { groupBoxes } from '@/shared/lib/points';
+
+export interface Area {
+	h: number;
+	w: number;
 	x: number;
 	y: number;
-	w: number;
-	h: number;
-};
+}
 
-export type FloatingTranslationType = {
-	text: string;
+export interface FloatingTranslationType {
 	area: Area;
-};
+	text: string;
+}
 
-type Props = {
+interface Props {
 	data: FloatingTranslationType;
 	onClose?: (id: string) => void;
-};
+}
 
 export function isInBox(
 	device_x: number,
@@ -62,7 +65,7 @@ export const BoxPolygon = (props: BoxPolygonProps) => {
 	});
 
 	// concave hull, concavity=2 → чем меньше, тем точнее повторяет форму
-	let hull = concaveman(allPoints, 2);
+	const hull = concaveman(allPoints, 2);
 
 	hull.pop();
 
@@ -81,23 +84,23 @@ export const BoxPolygon = (props: BoxPolygonProps) => {
 	return (
 		<svg
 			class='absolute inset-0 pointer-events-none'
-			width='100vw'
 			height='100vh'
+			width='100vw'
 		>
 			<polygon
-				points={pointsAttr}
 				fill='rgba(0,0,0,0.9)'
+				points={pointsAttr}
 				stroke='rgba(0,0,0,0.4)'
-				stroke-width={2}
-				stroke-linejoin='round'
 				stroke-linecap='round'
+				stroke-linejoin='round'
+				stroke-width={2}
 			/>
 		</svg>
 	);
 };
 
-export function FloatingTranslation(props: Props) {
-	const [translation, setTranslation] = createSignal<GroupedBox[]>([]);
+export const FloatingTranslation = (props: Props) => {
+	const [translation, setTranslation] = createSignal<TextBox[]>([]);
 
 
 
@@ -114,22 +117,24 @@ export function FloatingTranslation(props: Props) {
 		
 		add<[string, TextBox[]]>('floating_translate', ({ payload }) => {
 			log.info(
-				'[LAYOUT][EVENT][floating_translate]Listened to floating_translate event with payload: ' +
-					JSON.stringify(payload),
+				`[LAYOUT][EVENT][floating_translate]Listened to floating_translate event with payload: ${ 
+					JSON.stringify(payload)}`,
 			);
 
-			let grouped = groupBoxes(payload[1]);
+			const grouped = groupBoxes(payload[1]);
 
 
-			setTranslation(grouped);
+			setTranslation(payload[1]);
 		});
 
-		await startFloatingTranslate([props.data.area.x, props.data.area.y], [props.data.area.w, props.data.area.h]);
+		await startFloatingImageTranslate([props.data.area.x, props.data.area.y], [props.data.area.w, props.data.area.h]);
+		// await startFloatingTranslate([props.data.area.x, props.data.area.y], [props.data.area.w, props.data.area.h]);
 		
 		onCleanup(() => {
 			unsubs.forEach(fn => fn());
 		});
 	});
+
 
 	return (
 		<div
@@ -137,31 +142,46 @@ export function FloatingTranslation(props: Props) {
 			onClick={e => e.stopPropagation()}
 		>
 			<div
-				class='absolute border-2 border-border rounded select-none cursor-move'
 				style={{
 					left: `${props.data.area.x}px`,
 					top: `${props.data.area.y}px`,
 					width: `${props.data.area.w}px`,
 					height: `${props.data.area.h}px`,
 				}}
+				class='absolute border-2 border-border rounded select-none cursor-move'
 			>
-				<For each={translation()}>{item => <BoxPolygon boxes={item.boxes} />}</For>
-				<For each={translation()}>
-					{box => {
-						return (
+				{/* <For each={translation()}>
+					{box => (
 							<div
-								class='absolute overflow-hidden p-1'
 								style={{
 									left: `${box.grouped.x}px`,
 									top: `${box.grouped.y}px`,
 									width: `${box.grouped.w}px`,
 									height: `${box.grouped.h}px`,
 								}}
+								class='absolute overflow-hidden p-1'
 							>
 								{box.grouped.translation ?? box.grouped.text}
 							</div>
-						);
-					}}
+						)}
+				</For> */}
+				<For each={translation()}>
+					{box => (
+							<div
+								style={{
+									left: `${box.x}px`,
+									top: `${box.y}px`,
+									width: `${box.w}px`,
+									height: `${box.h}px`,
+								}}
+								class='absolute overflow-hidden p-1'
+							>
+								<img
+									class="absolute top-0 left-0 w-full h-full pointer-events-none"
+									src={`data:image/png;base64,${box.image}`}
+								/>
+							</div>
+						)}
 				</For>
 			</div>
 		</div>

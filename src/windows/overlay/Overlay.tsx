@@ -1,10 +1,11 @@
 import { onMount } from 'solid-js';
+
+import { applyTheme, initSettings } from '../../shared/stores/settings';
+import { TranslatorOverlay } from '../../widget/overlay/TranslatorOverlay';
+
 import '../../assets/style/index.css';
 
-import { TranslatorOverlay } from '../../widget/overlay/TranslatorOverlay';
-import { initSettings, applyTheme } from '../../shared/stores/settings';
-
-function Overlay() {
+const Overlay = () => {
 
 
 	onMount(() => {

@@ -1,9 +1,11 @@
 import { onMount } from "solid-js";
-import { initSettings, applyTheme } from "../../shared/stores/settings";
+
 import { Router } from '../../app/router/Router';
+import { applyTheme, initSettings } from "../../shared/stores/settings";
+
 import '../../assets/style/index.css';
 
-function Main() {
+const Main = () => {
 	onMount(() => {
 		initSettings()
 			.then(settings => {

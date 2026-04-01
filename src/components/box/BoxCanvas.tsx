@@ -1,10 +1,14 @@
-import { For, Accessor } from "solid-js";
-import { BoxElement } from "./BoxElement";
-import { TextBox } from "@/shared/types/ocr";
-import { log } from "@/shared/lib/log";
+import type { Accessor } from "solid-js";
+
 import concaveman from "concaveman";
 import roundPolygon, { getSegments } from "round-polygon";
+import { For } from "solid-js";
+
+import type { TextBox } from "@/shared/types/ocr";
+
 import { groupBoxes } from "@/shared/lib/points";
+
+import { BoxElement } from "./BoxElement";
 
 interface BoxCanvasProps {
   boxes: Accessor<TextBox[]>;
@@ -30,7 +34,7 @@ export const BoxPolygon = (props: BoxPolygonProps) => {
 	
 
 	// concave hull, concavity=2 → чем меньше, тем точнее повторяет форму
-	let hull = concaveman(allPoints, 2);
+	const hull = concaveman(allPoints, 2);
 
 	hull.pop();
 
@@ -49,16 +53,16 @@ export const BoxPolygon = (props: BoxPolygonProps) => {
 	return (
 		<svg
 			class='absolute inset-0 pointer-events-none'
-			width='100vw'
 			height='100vh'
+			width='100vw'
 		>
 			<polygon
-				points={pointsAttr}
 				fill='rgba(255,255,255,0.1)'
+				points={pointsAttr}
 				stroke='rgba(255,255,255,0.4)'
-				stroke-width={2}
-				stroke-linejoin='round'
 				stroke-linecap='round'
+				stroke-linejoin='round'
+				stroke-width={2}
 			/>
 		</svg>
 	);
@@ -73,11 +77,11 @@ export const BoxCanvas = (props: BoxCanvasProps) => {
 
   return (
 		<div class='fixed inset-0 z-9999 pointer-events-auto'>
-			<For each={grouped}>
+			{/* <For each={grouped}>
 				{(item) => <BoxPolygon boxes={item.boxes} />}
-			</For>
-			<For each={grouped}>
-				{(item, i) => <BoxElement box={item.grouped} index={i()} />}
+			</For> */}
+			<For each={props.boxes()}>
+				{(item, i) => <BoxElement box={item} index={i()} />}
 			</For>
 		</div>
 	);

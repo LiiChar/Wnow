@@ -1,4 +1,5 @@
 import { render } from 'solid-js/web';
+
 import Notification from './Notification';
 
 const wrapper = document.getElementById('app');

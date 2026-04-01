@@ -104,6 +104,7 @@ pub async fn translate_selected_text(app: &AppHandle) {
         y: logical_y,
         w: 0,
         h: 0,
+        image: None
     }];
 
     if let Some(window) = app.get_webview_window("overlay") {

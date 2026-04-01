@@ -15,6 +15,7 @@ pub struct OcrWord {
     pub h: i32,
     pub text: String,
     pub translation: Option<String>,
+    pub image: Option<String>,
 }
 
 static OCR_ENGINE: OnceLock<OcrEngine> = OnceLock::new();
@@ -93,6 +94,7 @@ pub fn recognize_with_boxes(
             h: (rect.height() as f32 / scale) as i32,
             text: r.text.clone(),
             translation: None,
+            image: None,
         });
 
         text.push_str(r.text.as_str());

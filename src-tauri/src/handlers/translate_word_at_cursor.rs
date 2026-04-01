@@ -146,6 +146,7 @@ pub async fn translate_word_at_cursor(app: &AppHandle) {
             y: logical_mouse_y - 10,
             w: 40,
             h: 20,
+            image: None
         };
 
         if let Some(window) = app.get_webview_window("overlay") {
@@ -190,6 +191,7 @@ pub async fn translate_word_at_cursor(app: &AppHandle) {
             y: abs_word_y,
             w: word_box.w,
             h: word_box.h,
+            image: None
         }];
 
         log!(

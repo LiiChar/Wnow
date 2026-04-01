@@ -1,6 +1,5 @@
-//! Обработчик показа перевода с заменой текста на изображении
-
 use base64::Engine;
+use futures::future::join_all;
 use image::RgbaImage;
 use std::time::Instant;
 use tauri::{AppHandle, Emitter, Manager};
@@ -11,9 +10,25 @@ use crate::img::{ocr_word_to_translated_box, replace_text_in_image, TextReplacem
 use crate::ocr::{postprocess_ocr, preprocess_for_tesseract_sys, recognize_with_boxes, OcrWord};
 use crate::platform::set_window_topmost;
 use crate::translation::translate;
-use futures::future::join_all;
 
-/// Показать перевод с заменой текста на изображении
+/// Один фрагмент (картинка + позиция)
+#[derive(serde::Serialize, Clone, Debug)]
+pub struct TranslatedFragment {
+    pub image: String,
+    pub x: i32,
+    pub y: i32,
+    pub w: i32,
+    pub h: i32,
+}
+
+/// Payload с фрагментами
+#[derive(serde::Serialize, Clone, Debug)]
+pub struct TranslatedFragmentsPayload {
+    pub fragments: Vec<TranslatedFragment>,
+    pub processing_time_ms: u64,
+}
+
+/// Основная функция
 pub async fn show_translate_with_replacement(app: &AppHandle) {
     let start_total = Instant::now();
 
@@ -28,35 +43,22 @@ pub async fn show_translate_with_replacement(app: &AppHandle) {
 
     log!(Level::Info, "Capture size: {}x{}", phys_w, phys_h);
 
-    // Шаг 1: Захват экрана
-    let start = Instant::now();
+    // 1. Capture
     let buffer = capture.capture_fragment(0, 0, phys_w as i32, phys_h as i32);
-    log!(Level::Info, "[1] Capture: {:?}", start.elapsed());
 
-    // Шаг 2: Предобработка для OCR
-    let start = Instant::now();
+    // 2. Preprocess
     let img = preprocess_for_tesseract_sys(&buffer, phys_w, phys_h, 30.0);
-    log!(Level::Info, "[2] Preprocess: {:?}", start.elapsed());
 
-    // Шаг 3: OCR
-    let start = Instant::now();
+    // 3. OCR
     let (_text, raw_boxes) = recognize_with_boxes(&img, phys_w as i32, phys_h as i32, scale);
     let boxes = postprocess_ocr(raw_boxes);
-    log!(
-        Level::Info,
-        "[3] OCR: {:?}, boxes: {}",
-        start.elapsed(),
-        boxes.len()
-    );
 
     if boxes.is_empty() {
-        log!(Level::Info, "No text found");
         fallback_to_normal_translate(app, &[]).await;
         return;
     }
 
-    // Шаг 4: Перевод всех боксов
-    let start = Instant::now();
+    // 4. Translate
     let translate_requests: Vec<String> = boxes.iter().map(|b| b.text.clone()).collect();
 
     let results = join_all(
@@ -66,23 +68,12 @@ pub async fn show_translate_with_replacement(app: &AppHandle) {
     )
     .await;
 
-    log!(Level::Info, "[4] Translate: {:?}", start.elapsed());
-
-    // Собираем переведённые боксы
     let mut translated_boxes = Vec::new();
+
     for (i, result) in results.into_iter().enumerate() {
         if let Ok(translated) = result {
             let original = &boxes[i];
-            log!(
-                Level::Debug,
-                "Box: '{}' -> '{}' at ({}, {}, {}x{})",
-                original.text,
-                translated,
-                original.x,
-                original.y,
-                original.w,
-                original.h
-            );
+
             translated_boxes.push(ocr_word_to_translated_box(
                 original.x,
                 original.y,
@@ -94,84 +85,100 @@ pub async fn show_translate_with_replacement(app: &AppHandle) {
         }
     }
 
-    // Шаг 5: Замена текста на изображении
-    let start = Instant::now();
-
-    // Конвертируем буфер в RgbaImage
+    // 5. Работа с изображением
     let rgba_image = match RgbaImage::from_raw(phys_w, phys_h, buffer.clone()) {
         Some(img) => img,
         None => {
-            log!(Level::Error, "Failed to create RgbaImage from buffer");
             fallback_to_normal_translate(app, &boxes).await;
             return;
         }
     };
 
     let replacement_params = TextReplacementParams::default();
+    let mut fragments = Vec::new();
 
-    match replace_text_in_image(&rgba_image, &translated_boxes, &replacement_params) {
-        Ok(result) => {
-            log!(
-                Level::Info,
-                "[5] Text replacement: {:?}, successful: {}/{}",
-                start.elapsed(),
-                result.stats.boxes_successful,
-                result.stats.boxes_processed
-            );
+    // 🔥 Главный цикл — делаем куски
+    for tb in &translated_boxes {
+        // 1. Вырезаем кусок
+        let sub_image = image::imageops::crop_imm(
+            &rgba_image,
+            tb.x as u32,
+            tb.y as u32,
+            tb.width as u32,
+            tb.height as u32,
+        )
+        .to_image();
 
-            // Конвертируем в base64
-            let mut img_buffer = Vec::new();
-            if let Err(e) = result.image.write_to(
-                &mut std::io::Cursor::new(&mut img_buffer),
-                image::ImageFormat::Png,
-            ) {
-                log!(Level::Error, "Failed to encode image: {}", e);
-                fallback_to_normal_translate(app, &boxes).await;
-                return;
+        // 2. Делаем локальный бокс (ВАЖНО)
+        let local_box = ocr_word_to_translated_box(
+            0,
+            0,
+            tb.width,
+            tb.height,
+            &tb.original_text,
+            &tb.translated_text,
+        );
+
+        // 3. Заменяем текст внутри куска
+        match replace_text_in_image(&sub_image, &[local_box], &replacement_params) {
+            Ok(result) => {
+                let mut img_buffer = Vec::new();
+
+                if result
+                    .image
+                    .write_to(
+                        &mut std::io::Cursor::new(&mut img_buffer),
+                        image::ImageFormat::Png,
+                    )
+                    .is_ok()
+                {
+                    let base64_image =
+                        base64::engine::general_purpose::STANDARD.encode(&img_buffer);
+
+                    fragments.push(TranslatedFragment {
+                        image: base64_image,
+                        x: tb.x,
+                        y: tb.y,
+                        w: tb.width,
+                        h: tb.height,
+                    });
+                }
             }
-
-            let base64_image = base64::engine::general_purpose::STANDARD.encode(&img_buffer);
-
-            log!(
-                Level::Info,
-                "[6] Encode: {:?}, size: {} bytes",
-                start.elapsed(),
-                img_buffer.len()
-            );
-
-            // Делаем overlay интерактивным
-            if let Some(overlay) = app.get_webview_window("overlay") {
-                overlay.set_ignore_cursor_events(false).ok();
-                overlay.set_focus().ok();
-                set_window_topmost(&overlay);
+            Err(e) => {
+                log!(Level::Error, "Fragment replace failed: {}", e);
             }
-
-            // Отправляем обработанное изображение
-            app.emit_to(
-                "overlay",
-                "show_translate_with_image",
-                &TranslatedImagePayload {
-                    image: base64_image,
-                    width: phys_w,
-                    height: phys_h,
-                    processing_time_ms: start_total.elapsed().as_millis() as u64,
-                    boxes_count: result.stats.boxes_successful,
-                },
-            )
-            .unwrap_or_else(|e| log!(Level::Error, "Failed to emit: {}", e));
-
-            log!(Level::Info, "Total time: {:?}", start_total.elapsed());
-        }
-        Err(e) => {
-            log!(Level::Error, "Text replacement failed: {}", e);
-            fallback_to_normal_translate(app, &boxes).await;
         }
     }
+
+    log!(
+        Level::Info,
+        "Fragments created: {}, total time: {:?}",
+        fragments.len(),
+        start_total.elapsed()
+    );
+
+    // Overlay активируем
+    if let Some(overlay) = app.get_webview_window("overlay") {
+        overlay.set_ignore_cursor_events(false).ok();
+        overlay.set_focus().ok();
+        set_window_topmost(&overlay);
+    }
+
+    // 6. Отправка
+    app.emit_to(
+        "overlay",
+        "show_translate_fragments",
+        &TranslatedFragmentsPayload {
+            fragments,
+            processing_time_ms: start_total.elapsed().as_millis() as u64,
+        },
+    )
+    .unwrap_or_else(|e| log!(Level::Error, "Failed to emit: {}", e));
 }
 
-/// Fallback: обычное отображение боксов если замена текста не удалась
+/// fallback
 async fn fallback_to_normal_translate(app: &AppHandle, boxes: &[OcrWord]) {
-    log!(Level::Info, "Falling back to normal translate");
+    log!(Level::Info, "Fallback to normal translate");
 
     if let Some(overlay) = app.get_webview_window("overlay") {
         overlay.set_ignore_cursor_events(false).ok();
@@ -181,14 +188,4 @@ async fn fallback_to_normal_translate(app: &AppHandle, boxes: &[OcrWord]) {
 
     app.emit_to("overlay", "show_translate", boxes)
         .expect("Failed to emit show_translate");
-}
-
-/// Payload для отправки обработанного изображения
-#[derive(serde::Serialize, Clone, Debug)]
-pub struct TranslatedImagePayload {
-    pub image: String,
-    pub width: u32,
-    pub height: u32,
-    pub processing_time_ms: u64,
-    pub boxes_count: usize,
 }

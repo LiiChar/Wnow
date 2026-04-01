@@ -1,12 +1,13 @@
-import { createSignal, createEffect, Show } from 'solid-js';
-import { ArrowLeftRight, Copy, Check, Volume2, Mic, Plus } from 'lucide-solid';
+import { ArrowLeftRight, Check, Copy, Mic, Plus, Volume2 } from 'lucide-solid';
+import { createEffect, createSignal, Show } from 'solid-js';
+
 import { Button } from '@/components/ui/Button';
-import { cn } from '@/shared/lib/utils';
-import { useSpeechRecognition } from '@/shared/hooks/useSpeechRecognition';
+import { addWordToStudy } from '@/shared/api/stude';
 import { translate } from '@/shared/api/translate';
 import { useDebounceCallback } from '@/shared/hooks/useDebounceCallback';
-import { addWordToStudy } from '@/shared/api/stude';
+import { useSpeechRecognition } from '@/shared/hooks/useSpeechRecognition';
 import { languages } from '@/shared/lib/language';
+import { cn } from '@/shared/lib/utils';
 
 export const Translate = () => {
   const [sourceText, setSourceText] = createSignal('');
@@ -65,10 +66,10 @@ export const Translate = () => {
       await navigator.clipboard.writeText(text);
       if (isSource) {
         setIsSourceCopying(true);
-        setTimeout(() => setIsSourceCopying(false), 2000);
+        setTimeout(setIsSourceCopying, 2000, false);
       } else {
         setIsTargetCopying(true);
-        setTimeout(() => setIsTargetCopying(false), 2000);
+        setTimeout(setIsTargetCopying, 2000, false);
       }
     } catch (err) {
       console.error('Failed to copy:', err);
@@ -88,9 +89,9 @@ export const Translate = () => {
 			<div class='flex items-center justify-between pb-1'>
 				<div class='flex justify-between items-center w-full gap-2'>
 					<select
+						class='cursor-pointer  max-w-[calc(50%-24px)] border-b border-r rounded-br-md border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary'
 						value={sourceLang()}
 						onInput={e => setSourceLang(e.currentTarget.value)}
-						class='cursor-pointer  max-w-[calc(50%-24px)] border-b border-r rounded-br-md border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary'
 					>
 						{languages.map(lang => (
 							<option value={lang.code}>{lang.name}</option>
@@ -98,18 +99,18 @@ export const Translate = () => {
 					</select>
 
 					<Button
-						variant='ghost'
-						size='sm'
-						onClick={handleSwapLanguages}
 						class='min-h-8 min-w-8 p-0 hover:bg-accent'
+						size='sm'
+						variant='ghost'
+						onClick={handleSwapLanguages}
 					>
 						<ArrowLeftRight class='h-4 w-4' />
 					</Button>
 
 					<select
+						class='cursor-pointer border-b border-l rounded-bl-md max-w-[calc(50%-24px)] border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary'
 						value={targetLang()}
 						onInput={e => setTargetLang(e.currentTarget.value)}
-						class='cursor-pointer border-b border-l rounded-bl-md max-w-[calc(50%-24px)] border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary'
 					>
 						{languages.map(lang => (
 							<option value={lang.code}>{lang.name}</option>
@@ -123,51 +124,51 @@ export const Translate = () => {
 				{/* Исходный текст */}
 				<div class='flex flex-1 flex-col w-1/2 relative'>
 					<textarea
+						class='flex-1 resize-none border-none bg-background p-2 pr-7 text-base leading-relaxed text-foreground outline-none'
+						placeholder='Введите текст для перевода...'
+						spellcheck='false'
 						value={sourceText()}
 						onInput={e => setSourceText(e.currentTarget.value)}
-						placeholder='Введите текст для перевода...'
-						class='flex-1 resize-none border-none bg-background p-2 pr-7 text-base leading-relaxed text-foreground outline-none'
-						spellcheck='false'
 					/>
 
 					<div class='absolute right-1 top-1 flex flex-col items-center gap-0'>
 						<Button
-							variant='ghost'
-							size='sm'
-							onClick={() => handleSpeak(sourceText(), sourceLang())}
-							disabled={!sourceText()}
 							class='h-7 w-7 p-0 hover:bg-accent'
+							disabled={!sourceText()}
+							size='sm'
+							variant='ghost'
+							onClick={() => handleSpeak(sourceText(), sourceLang())}
 						>
 							<Volume2 class='h-3.5 w-3.5' />
 						</Button>
 						<Button
-							variant='ghost'
-							size='sm'
-							onClick={() => handleCopy(sourceText(), true)}
-							disabled={!sourceText()}
 							class='h-7 w-7 p-0 hover:bg-accent'
+							disabled={!sourceText()}
+							size='sm'
+							variant='ghost'
+							onClick={() => handleCopy(sourceText(), true)}
 						>
 							<Show
-								when={isSourceCopying()}
 								fallback={<Copy class='h-3.5 w-3.5' />}
+								when={isSourceCopying()}
 							>
 								<Check class='h-3.5 w-3.5 text-green-600' />
 							</Show>
 						</Button>
 						<Button
-							variant='ghost'
+							class={cn(
+								'h-7 w-7 p-0 hover:bg-accent',
+								listening() && 'bg-accent',
+							)}
+							disabled={!supported}
 							size='sm'
+							variant='ghost'
 							onClick={async () => {
 								await navigator.mediaDevices.getUserMedia({
 									audio: true,
 								});
 								start();
 							}}
-							disabled={!supported}
-							class={cn(
-								'h-7 w-7 p-0 hover:bg-accent',
-								listening() && 'bg-accent',
-							)}
 						>
 							<Mic class='h-3.5 w-3.5' />
 						</Button>
@@ -187,14 +188,14 @@ export const Translate = () => {
 						</div>
 					)}
 					<textarea
-						value={translatedText()}
 						readOnly
-						placeholder='Перевод появится здесь...'
 						class={cn(
 							'h-full w-full resize-none border-none bg-background p-2 pr-7 text-base leading-relaxed text-foreground outline-none',
 							isLoading() && 'text-transparent',
 						)}
+						placeholder='Перевод появится здесь...'
 						spellcheck='false'
+						value={translatedText()}
 					/>
 					{/* <div class='absolute bottom-1 right-3.5  text-xs text-muted-foreground'>
 						{translatedText().length}
@@ -202,31 +203,35 @@ export const Translate = () => {
 
 					<div class='flex flex-col items-center gap-0 absolute right-1 top-1 '>
 						<Button
-							variant='ghost'
-							size='sm'
-							onClick={() => handleSpeak(translatedText(), targetLang())}
-							disabled={!translatedText()}
 							class='h-7 w-7 p-0 hover:bg-accent'
+							disabled={!translatedText()}
+							size='sm'
+							variant='ghost'
+							onClick={() => handleSpeak(translatedText(), targetLang())}
 						>
 							<Volume2 class='h-3.5 w-3.5' />
 						</Button>
 						<Button
-							variant='ghost'
-							size='sm'
-							onClick={() => handleCopy(translatedText(), false)}
-							disabled={!translatedText()}
 							class='h-7 w-7 p-0 hover:bg-accent'
+							disabled={!translatedText()}
+							size='sm'
+							variant='ghost'
+							onClick={() => handleCopy(translatedText(), false)}
 						>
 							<Show
-								when={isTargetCopying()}
 								fallback={<Copy class='h-3.5 w-3.5' />}
+								when={isTargetCopying()}
 							>
 								<Check class='h-3.5 w-3.5 text-green-600' />
 							</Show>
 						</Button>
 						<Button
+							class={cn(
+								'h-7 w-7 p-0 hover:bg-accent',
+							)}
+							disabled={!sourceText()} 
+							size='sm'
 							variant='ghost'
-							size='sm' 
 							onClick={async () => {
 								await addWordToStudy(
 									sourceText(),
@@ -234,14 +239,10 @@ export const Translate = () => {
 									null,
 								);
 								setAdded(true);
-								setTimeout(() => setAdded(false), 2000);
+								setTimeout(setAdded, 2000, false);
 							}}
-							disabled={!sourceText()}
-							class={cn(
-								'h-7 w-7 p-0 hover:bg-accent',
-							)}
 						>
-							<Show when={isAdded()} fallback={<Plus class='h-3.5 w-3.5' />}>
+							<Show fallback={<Plus class='h-3.5 w-3.5' />} when={isAdded()}>
 								<Check class='h-3.5 w-3.5' />
 							</Show>
 						</Button>

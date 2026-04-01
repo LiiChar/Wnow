@@ -5,39 +5,6 @@ use tauri::{
     AppHandle, LogicalPosition, LogicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
 };
 
-// pub fn create_select_region_window(
-//     app: &AppHandle,
-//     monitor: u32,
-// ) -> Result<WebviewWindow, tauri::Error> {
-//     let window =
-//         WebviewWindowBuilder::new(app, "select", WebviewUrl::App("select.html".into()))
-//             .title("Transcendia - Select a region")
-//             .accept_first_mouse(true)
-//             .always_on_top(true)
-//             .visible_on_all_workspaces(true)
-//             .shadow(false)
-//             .background_color(Color(0, 0, 0, 0))
-//             .decorations(false)
-//             .disable_drag_drop_handler()
-//             .transparent(true)
-//             .resizable(false)
-//             .visible(false)
-//             .build()?;
-
-//     let monitors = xcap::Monitor::all().expect("Could not retrieve monitors");
-//     let monitor = monitors
-//         .iter()
-//         .find(|m| m.id().unwrap() == monitor)
-//         .unwrap_or(monitors.get(0).expect("Cannot find any monitor"));
-//     let scale = monitor.scale_factor().unwrap();
-//     window.set_position(LogicalPosition { x: monitor.x().unwrap() as f32 * scale, y: monitor.y().unwrap() as f32 * scale })?;
-//     window.set_size(LogicalSize { width: monitor.width().unwrap() as f32, height: monitor.height().unwrap() as f32 })?;
-//     window.show()?;
-//     window.set_focus()?;
-
-//     Ok(window)
-// }
-
 pub fn create_main_window(app: &AppHandle) -> Result<WebviewWindow, tauri::Error> {
     let window = WebviewWindowBuilder::new(app, "index", WebviewUrl::App("index.html".into()))
         .title("Wnow - Configuration")
@@ -65,13 +32,32 @@ pub fn create_notification_window(app: &AppHandle) -> Result<WebviewWindow, taur
         .transparent(true)
         .resizable(false)
         .skip_taskbar(true)
-        .visible(false)
         .content_protected(true)
-
         .build()?;
-    window.set_ignore_cursor_events(true)?;
 
+    let monitors = xcap::Monitor::all().expect("Could not retrieve monitors");
 
+    let monitor = monitors
+        .iter()
+        .find(|m| m.is_primary().unwrap() == true)
+        .unwrap_or(monitors.get(0).expect("Cannot find any monitor"));
+
+    // Позиционируем в правый нижний угол после создания
+    let scale = monitor.scale_factor().expect("Cannot get scake factor");
+    let height = monitor.height().expect("Cannot get inner size");
+    let width = monitor.width().expect("Cannot get inner size");
+    let position_x = monitor.x().expect("Cannot get position");
+    let position_y = monitor.y().expect("Cannot get position");
+
+    let window_width: f64 = 280.0;
+    let window_height: f64 = 272.0;
+
+    let x = (position_x as f64 + width as f64 - window_width - 16.0) / scale as f64;
+    let y = (position_y as f64 + height as f64 - window_height - 66.0) / scale as f64;
+
+    window
+        .set_position(tauri::LogicalPosition::new(x, y))
+        .ok();
 
     Ok(window)
 }
@@ -86,9 +72,9 @@ pub fn create_overlay_window(app: &AppHandle) -> Result<WebviewWindow, tauri::Er
         .transparent(true)
         .resizable(false)
         .skip_taskbar(true)
-        .visible(false)
         .content_protected(true)
-        .fullscreen(true)
+        .visible(false)
+        // .fullscreen(true)
         .maximized(true)
         .build()?;
     window.set_ignore_cursor_events(true)?;
@@ -109,79 +95,8 @@ pub fn create_overlay_window(app: &AppHandle) -> Result<WebviewWindow, tauri::Er
         height: monitor.height().unwrap() as f32,
     })?;
     window.show()?;
-    window.set_focus()?;
+    // window.set_focus()?;
+    // window.set_shadow(false)?;
 
     Ok(window)
 }
-
-// pub fn create_download_window(app: &AppHandle) -> Result<WebviewWindow, tauri::Error> {
-//     let window =
-//         WebviewWindowBuilder::new(app, "downloader", WebviewUrl::App("models.html".into()))
-//             .title("Transcendia - Downloader")
-//             .always_on_top(true)
-//             .accept_first_mouse(true)
-//             .inner_size(500f64, 310f64)
-//             .resizable(false)
-//             .build()?;
-//     window.set_focus()?;
-
-//     Ok(window)
-// }
-
-// pub fn create_overlay_window(
-//     app: &AppHandle,
-//     region: &Region,
-//     monitor: u32,
-//     blur: bool,
-// ) -> Result<WebviewWindow, tauri::Error> {
-//     let window = WebviewWindowBuilder::new(app, "overlay", WebviewUrl::App("overlay.html".into()))
-//         .title("Transcendia - Overlay")
-//         .always_on_top(true)
-//         .visible_on_all_workspaces(true)
-//         .shadow(false)
-//         .background_color(Color(0, 0, 0, 0))
-//         .decorations(false)
-//         .transparent(true)
-//         .resizable(false)
-//         .visible(false)
-//         .content_protected(true)
-//         .build()?;
-//     window.set_ignore_cursor_events(true)?;
-
-//     edit_overlay(&window, &region, monitor, blur)?;
-//     window.show()?;
-
-//     Ok(window)
-// }
-
-// pub fn edit_overlay(
-//     window: &WebviewWindow,
-//     region: &Region,
-//     monitor: u32,
-//     blur: bool,
-// ) -> Result<(), tauri::Error> {
-//     let monitors = xcap::Monitor::all().expect("Could not retrieve monitors");
-//     let monitor = monitors
-//         .iter()
-//         .find(|m| m.id().unwrap() == monitor)
-//         .unwrap_or(monitors.get(0).expect("Cannot find any monitor"));
-//     window.set_position(LogicalPosition {
-//         x: monitor.x().unwrap() as f32 * monitor.scale_factor().unwrap() + region.x as f32,
-//         y: monitor.y().unwrap() as f32 * monitor.scale_factor().unwrap() + region.y as f32,
-//     })?;
-//     window.set_size(LogicalSize {
-//         width: region.w,
-//         height: region.h,
-//     })?;
-
-//     if blur {
-//         window.set_effects(WindowEffectsConfig {
-//             effects: vec![WindowEffect::HudWindow],
-//             state: Some(WindowEffectState::Active),
-//             radius: Some(30f64),
-//             color: None,
-//         })?;
-//     }
-
-//     Ok(())
-// }

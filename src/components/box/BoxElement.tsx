@@ -1,20 +1,23 @@
-import { TextBox } from "@/shared/types/ocr";
-import { createSignal, Show } from "solid-js";
-import { ToastStatus } from "../toaster/ToastStatus";
-import { toaster } from "@kobalte/core/toast";
 import { Check, Copy, Plus } from "lucide-solid";
+import { createSignal, Show } from "solid-js";
+
+import type { TextBox } from "@/shared/types/ocr";
+
+import { showNotification } from "@/shared/api/notification";
 import { addWordToStudy } from "@/shared/api/stude";
 
-type BoxElementProps = {
+interface BoxElementProps {
 	box: TextBox
-  onHover?: (box: TextBox) => void;
-  onClick?: (box: TextBox) => void;
   index: number;
-};
+  onClick?: (box: TextBox) => void;
+  onHover?: (box: TextBox) => void;
+}
 
 export const BoxElement = (props: BoxElementProps) => {
   const [isHovered, setIsHovered] = createSignal(false);
-  const [isSelected, setIsSelected] = createSignal(props.box.w == 0 && props.box.h == 0);
+  const [isSelected, setIsSelected] = createSignal(
+    props.box.w === 0 && props.box.h === 0,
+  );
 	const [added, setAdded] = createSignal(false);
 	const [copied, setCopied] = createSignal(false);
 
@@ -24,11 +27,10 @@ export const BoxElement = (props: BoxElementProps) => {
 		navigator.clipboard.writeText(props.box.translation ?? props.box.text);
 		setCopied(true);
 
-		toaster.show(p => (
-			<ToastStatus status='success' text='Скопировано' toastId={p.toastId} />
-		));
 
-		setTimeout(() => setCopied(false), 2000);
+		showNotification({status: 'success', title: 'Скопировано', text: props.box.translation ?? props.box.text, duration: 2000});
+
+		setTimeout(setCopied, 2000, false);
 	};
 
 	const handleAddToStudy = async () => {
@@ -41,13 +43,12 @@ export const BoxElement = (props: BoxElementProps) => {
 			);
 		} catch (e) {
 			console.error('Failed to add word:', e);
-			toaster.show(props => (
-				<ToastStatus
-					status='error'
-					text='Ошибка сохранения'
-					toastId={props.toastId}
-				/>
-			));
+			showNotification({
+				status: 'error',
+				title: 'Ошибка',
+				text: 'Не удалось добавить слово',
+				duration: 2000,
+			});
 		}
 	};
 
@@ -57,14 +58,16 @@ export const BoxElement = (props: BoxElementProps) => {
 		handleAddToStudy();
 		setAdded(true);
 
-		toaster.show(p => (
-			<ToastStatus status='success' text='Добавлено' toastId={p.toastId} />
-		));
+		showNotification({
+			status: 'success',
+			title: 'Добавлено',
+			text: 'Слово добавлено в изучение',
+			duration: 2000,
+		});
 	};
 
 	return (
 		<div
-			class='fixed cursor-pointer z-10000'
 			style={{
 				left: `${props.box.x - padding}px`,
 				top: `${props.box.y - padding}px`,
@@ -72,6 +75,7 @@ export const BoxElement = (props: BoxElementProps) => {
 				height: `${props.box.h + padding * 2}px`,
 				'animation-delay': `${props.index * 20}ms`,
 			}}
+			class='fixed cursor-pointer z-10000'
 			onClick={e => {
 				e.stopPropagation();
 				setIsSelected(prev => !prev);
@@ -95,6 +99,32 @@ export const BoxElement = (props: BoxElementProps) => {
 				// }}
 			/>
 
+			{/* <div
+        style={{
+						background: isHovered() ? "rgba(163, 163, 163, 0.25)" : "rgba(163, 163, 163, 0.1)",
+						border: isHovered() ? "1.5px solid rgba(163, 163, 163, 0.8)" : "1px solid rgba(163, 163, 163, 0.4)",
+					}}
+				class="absolute inset-0 rounded transition-all duration-150"
+      >
+				<Show when={props.box.image}>
+					<img
+						class="absolute top-0 left-0 w-full h-full pointer-events-none"
+						src={`data:image/png;base64,${props.box.image}`}
+						/>
+				</Show>
+			</div> */}
+
+			<div
+				class="absolute inset-0 rounded transition-all duration-150"
+      >
+				<Show when={props.box.image}>
+					<img
+						class="absolute top-0 left-0 w-full h-full pointer-events-none"
+						src={`data:image/png;base64,${props.box.image}`}
+						/>
+				</Show>
+			</div>
+
 			<Show when={isHovered() || isSelected()}>
 				<div
 					class='absolute z-50 left-1/2 -translate-x-1/2 animate-fade-in max-h-32'
@@ -104,6 +134,7 @@ export const BoxElement = (props: BoxElementProps) => {
 					}}
 				>
 					<div class='bg-background/90  flex border-border border rounded '>
+						
 						<div class='px-3 py-2 whitespace-nowrap'>
 							<div class='text-xs text-muted-foreground'>{props.box.text}</div>
 							<div class='text-sm'>
@@ -112,19 +143,19 @@ export const BoxElement = (props: BoxElementProps) => {
 						</div>
 						<div class='border-l border-border w-5 flex flex-col'>
 							<button
-								onClick={handleAdd}
 								class='flex-1 w-full h-1/2 flex justify-center items-center p-0.5'
+								onClick={handleAdd}
 							>
-								<Show when={added()} fallback={<Plus size={16} />}>
+								<Show fallback={<Plus size={16} />} when={added()}>
 									<Check size={16} />
 								</Show>
 							</button>
 
 							<button
-								onClick={handleCopy}
 								class='flex-1 border-t border-border w-full h-1/2 flex justify-center items-center p-0.5'
+								onClick={handleCopy}
 							>
-								<Show when={copied()} fallback={<Copy size={14} />}>
+								<Show fallback={<Copy size={14} />} when={copied()}>
 									<Check size={16} />
 								</Show>
 							</button>

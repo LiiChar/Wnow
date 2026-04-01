@@ -8,6 +8,7 @@ import { createMemo, createSignal, For, onMount } from "solid-js";
 import { listen } from '@tauri-apps/api/event';
 import { log } from "@/shared/lib/log";
 import { Input } from "@/components/ui/Input";
+import { showNotification } from "@/shared/api/notification";
 
 const getLangFromModelId = (modelId: string) => {
   const lang = modelId.replace("gaudi/opus-mt-", "").replace("-ctranslate2", "");
@@ -127,13 +128,12 @@ export const Models = () => {
 										if (models().includes(model)) return;
 
 										await downloadModel(model);
-										toaster.show(props => (
-											<ToastStatus
-												status='success'
-												text='Модель успешно скачена'
-												toastId={props.toastId}
-											/>
-										));
+										showNotification({
+											status: 'success',
+											title: 'Модель успешно скачена',
+											duration: 2000,
+											text: ""
+										});
 									}}
 								/>
 							);

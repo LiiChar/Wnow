@@ -48,3 +48,11 @@ pub fn setup_main_window(app: &AppHandle) {
         });
     }
 }
+
+/// Настройка notification окна - прозрачное, поверх всех окон
+pub fn setup_notification_window(app: &AppHandle) {
+    if let Some(notification) = app.get_webview_window("notification") {
+        notification.set_ignore_cursor_events(true).ok();
+        set_window_topmost(&notification);
+    }
+}

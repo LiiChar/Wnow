@@ -135,6 +135,7 @@ pub async fn translate_image_with_replacement(
                     h: b.h,
                     text: b.text.clone(),
                     translation: Some(translated.clone()),
+                    image: None
                 });
             }
         }
@@ -157,6 +158,7 @@ pub async fn translate_image_with_replacement(
             min_font_size: 8.0,
             max_font_size: 48.0,
             font_size_step: 0.5,
+            letter_spacing: 1.1,
         };
 
         // Выполняем замену текста
@@ -269,6 +271,7 @@ pub async fn translate_fragment(
                     h: b.h,
                     text: b.text.clone(),
                     translation: Some(translated),
+                    image: None
                 });
             }
         }

@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import { TextBox, ImageTranslationParams, ImageTranslationResult } from "../types/ocr";
+
+import type { TextBox } from "../types/ocr";
 
 
 type PosTranslateBlock = [number, number];
@@ -29,27 +30,28 @@ export const startFloatingTranslate = async (position: PosTranslateBlock, size: 
 	});
 };
 
+export const startFloatingImageTranslate = async (position: PosTranslateBlock, size: SizeTranslateBlock) => {
+	await invoke('start_floating_image_translate', {
+		pos: position,
+		size,
+	});
+};
+
 export const stopFloatingTranslate = async () => {
 	await invoke('stop_floating_translate');
 };
 
-/**
- * Перевод изображения с заменой текста
- * @param params Параметры перевода
- * @returns Результат с обработанным изображением
- */
-export const translateImageWithReplacement = async (
-	params: ImageTranslationParams
-): Promise<ImageTranslationResult> => {
-	const result = await invoke<ImageTranslationResult>('translate_image_with_replacement', {
-		params,
+export const getBlockImageTranslate = async (
+	position: PosTranslateBlock,
+	size: SizeTranslateBlock,
+) => {
+	const result = await invoke<TextBox[]>('get_block_image_translate', {
+		pos: position,
+		size,
 	});
 	return result;
 };
 
-/**
- * Упрощённый перевод фрагмента (без обработки изображения)
- */
 export const translateFragment = async (
 	pos: [number, number],
 	size: [number, number],

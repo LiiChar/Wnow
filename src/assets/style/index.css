@@ -203,3 +203,52 @@ svg > path {
 *[data-tauri-drag-region] {
   app-region: drag;
 }
+
+/* ===== NOTIFICATION ANIMATIONS ===== */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.notification-card {
+  animation: slideIn 0.2s ease-out;
+}
+
+.notification-card.removing {
+  animation: slideOut 0.2s ease-in forwards;
+}
+
+@keyframes progress {
+	from {
+		width: 100%;
+	}
+	to {
+		width: 0%;
+	}
+}
