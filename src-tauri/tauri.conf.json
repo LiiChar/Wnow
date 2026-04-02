@@ -35,7 +35,7 @@
       "resources/dictionary/**/*",
       "resources/fonts/**/*",
       "resources/ocr-model/**/*",
-      "resources/screenshot/**/*"
+      "resources/screenshot"
     ]
   }
 }
