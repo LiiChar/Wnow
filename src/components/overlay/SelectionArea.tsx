@@ -1,17 +1,19 @@
 import { Check, Pin, X } from "lucide-solid";
-import { createSignal, createMemo, Show } from "solid-js";
+import { createMemo, createSignal, Show } from "solid-js";
+
 import { Button } from "../ui/Button";
+import { settingsStore } from "@/shared/stores/settings";
 
-type Rect = { x: number; y: number; w: number; h: number };
+interface Rect { h: number; w: number; x: number; y: number; }
 
-export type SelectionMode = 'translate' | 'persistent';
+export type SelectionMode = 'persistent' | 'translate';
 
-type Props = {
-  onConfirm: (rect: Rect, mode: SelectionMode) => void;
+interface Props {
   onCancel?: () => void;
-};
+  onConfirm: (rect: Rect, mode: SelectionMode) => void;
+}
 
-export function SelectionArea(props: Props) {
+export const SelectionArea = (props: Props) => {
   const [rect, setRect] = createSignal<Rect | null>(null);
   const [startPos, setStartPos] = createSignal<{ x: number; y: number } | null>(null);
   const [isSelecting, setIsSelecting] = createSignal(false);
@@ -123,12 +125,12 @@ export function SelectionArea(props: Props) {
 
   return (
 		<div
-			onMouseDown={onMouseDown}
-			class='fixed inset-0 z-10003'
 			style={{
 				cursor: isSelecting() ? 'crosshair' : 'default',
-				background: 'rgba(0, 0, 0, 0.5)',
+				background: `rgba(0, 0, 0, 0.5)`,
 			}}
+			class='fixed inset-0 z-10003'
+			onMouseDown={onMouseDown}
 		>
 			{/* Selection rectangle */}
 			<Show when={rect() && rect()!.w > 0}>
@@ -136,35 +138,35 @@ export function SelectionArea(props: Props) {
 				<svg class='fixed inset-0 w-full h-full pointer-events-none'>
 					<defs>
 						<mask id='cutout'>
-							<rect x='0' y='0' width='100%' height='100%' fill='white' />
+							<rect fill='white' height='100%' width='100%' x='0' y='0' />
 							<rect
+								fill='black'
+								height={rect()!.h}
+								width={rect()!.w}
 								x={rect()!.x}
 								y={rect()!.y}
-								width={rect()!.w}
-								height={rect()!.h}
-								fill='black'
 							/>
 						</mask>
 					</defs>
 					<rect
+						fill={`rgba(0,0,0,0.${settingsStore.overlay_opacity})`}
+						height='100%'
+						mask='url(#cutout)'
+						width='100%'
 						x='0'
 						y='0'
-						width='100%'
-						height='100%'
-						fill='rgba(0,0,0,0.4)'
-						mask='url(#cutout)'
 					/>
 				</svg>
 
 				{/* Border */}
 				<div
-					class='absolute border-2 border-border rounded select-none'
 					style={{
 						left: `${rect()!.x}px`,
 						top: `${rect()!.y}px`,
 						width: `${rect()!.w}px`,
 						height: `${rect()!.h}px`,
 					}}
+					class='absolute border-2 border-border rounded select-none'
 				>
 					{/* Size indicator */}
 					<div class='absolute -top-7 left-1/2 -translate-x-1/2 px-2 py-1 bg-muted text-muted-foreground whitespace-nowrap rounded text-xs font-mono'>
@@ -180,27 +182,27 @@ export function SelectionArea(props: Props) {
 					>
 						<Button
 							data-action
-							onClick={() => handleConfirm('translate')}
-							title='Перевести (однократно)'
 							class='aspect-square'
+							title='Перевести (однократно)'
+							onClick={() => handleConfirm('translate')}
 						>
 							<Check size={16} />
 						</Button>
 						<Button
-							variant={'outline'}
 							data-action
-							onClick={() => handleConfirm('persistent')}
-							title='Постоянный перевод'
 							class='aspect-square'
+							title='Постоянный перевод'
+							variant={'outline'}
+							onClick={() => handleConfirm('persistent')}
 						>
 							<Pin size={16} />
 						</Button>
 						<Button
-							variant={'destructive'}
 							data-action
-							onClick={handleCancel}
-							title='Отмена'
 							class='aspect-square'
+							title='Отмена'
+							variant={'destructive'}
+							onClick={handleCancel}
 						>
 							<X size={16} />
 						</Button>

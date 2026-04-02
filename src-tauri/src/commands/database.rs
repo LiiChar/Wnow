@@ -54,6 +54,12 @@ pub async fn delete_word(word_id: i64) -> Result<(), String> {
     Database::delete_word(word_id)
 }
 
+/// Очистить весь словарь
+#[tauri::command]
+pub async fn clear_all_words() -> Result<i64, String> {
+    Database::clear_all_words()
+}
+
 /// Получить статистику
 #[tauri::command]
 pub async fn get_learning_stats() -> Result<LearningStats, String> {

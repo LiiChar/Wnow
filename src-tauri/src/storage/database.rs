@@ -1,4 +1,5 @@
 use super::models::*;
+use enigo::Settings;
 use once_cell::sync::Lazy;
 use rusqlite::{params, Connection};
 use std::path::PathBuf;
@@ -330,6 +331,18 @@ impl Database {
         Ok(())
     }
 
+    /// Очистить весь словарь
+    pub fn clear_all_words() -> Result<i64, String> {
+        let guard = DB.lock().unwrap();
+        let conn = guard.as_ref().ok_or("Database not initialized")?;
+
+        let deleted = conn
+            .execute("DELETE FROM words", [])
+            .map_err(|e| e.to_string())?;
+
+        Ok(deleted as i64)
+    }
+
     /// Получить статистику
     pub fn get_stats() -> Result<LearningStats, String> {
         let guard = DB.lock().unwrap();
@@ -471,6 +484,10 @@ impl Database {
             settings.compact_mode = v == "true";
         }
 
+        if let Some(v) = Self::get_setting("floating_delay") {
+            settings.floating_delay = v.parse().unwrap_or(AppSettings::default().floating_delay);
+        }
+
         settings
     }
 
@@ -527,6 +544,8 @@ impl Database {
         Self::set_setting("enable_sound", if settings.enable_sound { "true" } else { "false" })?;
         Self::set_setting("show_word_context", if settings.show_word_context { "true" } else { "false" })?;
         Self::set_setting("compact_mode", if settings.compact_mode { "true" } else { "false" })?;
+        Self::set_setting("floating_delay", &settings.floating_delay.to_string())?;
+
         Ok(())
     }
 }

@@ -144,6 +144,7 @@ export const en: Locale = {
 			hideAfterShowDesc: 'Automatically hide overlay after display',
 			soundEffects: 'Sound effects',
 			soundEffectsDesc: 'Play sound when showing translation',
+			floatingDelay: 'Floating delay',
 		},
 		reset: {
 			button: 'Reset settings to default',
@@ -153,6 +154,15 @@ export const en: Locale = {
 			successDesc: 'All settings have been reset to default',
 			error: 'Error',
 			errorDesc: 'Failed to reset settings',
+		},
+		dictionary: {
+			button: 'Clear dictionary',
+			confirmTitle: 'Are you sure?',
+			confirmDesc: 'All words will be permanently deleted',
+			success: 'Dictionary cleared',
+			successDesc: 'All words have been deleted from dictionary',
+			error: 'Error',
+			errorDesc: 'Failed to clear dictionary',
 		},
 	},
 	toast: {

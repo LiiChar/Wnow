@@ -49,6 +49,7 @@ export interface AppSettings {
   show_notifications: boolean;
   minimize_to_tray: boolean;
   start_minimized: boolean;
+  floating_delay: number;
   // Новые настройки
   auto_launch: boolean;
   overlay_opacity: number;

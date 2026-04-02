@@ -142,8 +142,18 @@ export interface Locale {
 			hideAfterShowDesc: string;
 			soundEffects: string;
 			soundEffectsDesc: string;
+			floatingDelay: string;
 		};
 		reset: {
+			button: string;
+			confirmTitle: string;
+			confirmDesc: string;
+			success: string;
+			successDesc: string;
+			error: string;
+			errorDesc: string;
+		};
+		dictionary: {
 			button: string;
 			confirmTitle: string;
 			confirmDesc: string;

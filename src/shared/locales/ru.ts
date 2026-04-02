@@ -160,6 +160,7 @@ export const ru: Locale = {
 			hideAfterShowDesc: 'Автоматически скрывать overlay после показа',
 			soundEffects: 'Звуковые эффекты',
 			soundEffectsDesc: 'Воспроизводить звук при показе перевода',
+			floatingDelay: 'Плавающий задержка',
 		},
 		reset: {
 			button: 'Сбросить настройки по умолчанию',
@@ -169,6 +170,15 @@ export const ru: Locale = {
 			successDesc: 'Все настройки возвращены к значениям по умолчанию',
 			error: 'Ошибка',
 			errorDesc: 'Не удалось сбросить настройки',
+		},
+		dictionary: {
+			button: 'Очистить словарь',
+			confirmTitle: 'Вы уверены?',
+			confirmDesc: 'Все слова будут безвозвратно удалены',
+			success: 'Словарь очищен',
+			successDesc: 'Все слова удалены из словаря',
+			error: 'Ошибка',
+			errorDesc: 'Не удалось очистить словарь',
 		},
 	},
 	toast: {

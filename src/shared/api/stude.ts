@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import { FlashcardWord, LearningStats, SavedWord } from "../types/storage";
+
+import type { FlashcardWord, LearningStats, SavedWord } from "../types/storage";
 
 export const addWordToStudy = async (
 	text: string,
@@ -19,26 +20,18 @@ export const addWordToStudy = async (
 		translation: translation.trim(),
 		context: context?.trim() ?? '',
 		contextTranslation: contextTranslation?.trim() ?? '',
-		screenshotPath: screenshotPath,
+		screenshotPath,
 	});
 };
 
-export const getAllWords = async () => {
-  return await invoke<SavedWord[]>('get_all_words');
-}
+export const getAllWords = async () => invoke<SavedWord[]>('get_all_words')
 
-export const deleteWord = async (id: number) => {
-  return await invoke('delete_word', { wordId: id });
-}
+export const deleteWord = async (id: number) => invoke('delete_word', { wordId: id })
 
-export const getWordsForStudy = async (limit: number) => {
-  return await invoke<FlashcardWord[]>('get_words_for_study', { limit });
-}
+export const clearAllWords = async () => invoke<number>('clear_all_words')
 
-export const getLearningStats = async () => {
-  return await invoke<LearningStats>('get_learning_stats');
-}
+export const getWordsForStudy = async (limit: number) => invoke<FlashcardWord[]>('get_words_for_study', { limit })
 
-export const updateWordProgress = async (wordId: number, quality: number) => {
-  return await invoke('update_word_progress', { wordId, quality });
-}
+export const getLearningStats = async () => invoke<LearningStats>('get_learning_stats')
+
+export const updateWordProgress = async (wordId: number, quality: number) => invoke('update_word_progress', { wordId, quality })

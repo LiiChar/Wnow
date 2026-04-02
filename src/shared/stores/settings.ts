@@ -19,6 +19,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   show_notifications: true,
   minimize_to_tray: true,
   start_minimized: false,
+  floating_delay: 1000,
   image_replacement: false,
   // Новые настройки по умолчанию
   auto_launch: false,

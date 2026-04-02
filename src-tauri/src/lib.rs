@@ -145,6 +145,7 @@ pub fn run() {
             commands::database::get_words_for_study,
             commands::database::update_word_progress,
             commands::database::delete_word,
+            commands::database::clear_all_words,
             commands::database::get_learning_stats,
             commands::database::get_settings,
             commands::database::save_settings,

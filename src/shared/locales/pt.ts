@@ -144,6 +144,7 @@ export const pt: Locale = {
 			hideAfterShowDesc: 'Ocultar automaticamente o overlay após exibição',
 			soundEffects: 'Efeitos sonoros',
 			soundEffectsDesc: 'Reproduzir som ao mostrar tradução',
+			floatingDelay: 'Atraso flutuante',
 		},
 		reset: {
 			button: 'Redefinir configurações para padrão',

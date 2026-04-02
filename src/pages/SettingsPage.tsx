@@ -1,4 +1,4 @@
-import { Bell, Copy, Eye, EyeOff, KeyRound, Languages, Layers, Monitor, Palette, Play, RotateCcw, Save, Sparkles, Volume2 } from 'lucide-solid';
+import { Bell, Copy, Eye, EyeOff, KeyRound, Languages, Layers, Monitor, Palette, Play, RotateCcw, Save, Sparkles, Trash, Volume2 } from 'lucide-solid';
 import { createSignal, onMount } from 'solid-js';
 
 import { BottomPadding } from '@/components/layout/BottomPadding';
@@ -15,6 +15,7 @@ import { Models } from '@/widget/settings/Models';
 import { HotkeyInput } from '../components/ui/HotkeyInput';
 import { DEFAULT_SETTINGS, settingsStore, updateSettings } from '../shared/stores/settings';
 import { LANGUAGES } from '../shared/types/storage';
+import { clearAllWords } from '@/shared/api/stude';
 
 interface SelectOption {
 	label: string;
@@ -153,6 +154,24 @@ export const SettingsPage = () => {
 			createToast({
 				title: t().settings.reset.error,
 				description: t().settings.reset.errorDesc,
+				type: 'error'
+			});
+		}
+	};
+
+	const handleClearDictionary = async () => {
+		try {
+			await clearAllWords();
+			createToast({
+				title: t().settings.dictionary.success,
+				description: t().settings.dictionary.successDesc,
+				type: 'success'
+			});
+		} catch (e) {
+			console.error('Failed to clear dictionary:', e);
+			createToast({
+				title: t().settings.dictionary.error,
+				description: t().settings.dictionary.errorDesc,
 				type: 'error'
 			});
 		}
@@ -583,41 +602,21 @@ export const SettingsPage = () => {
 					</div>
 
 					<div class='space-y-2'>
-						<label class='text-sm font-medium'>{t().settings.overlay.position}</label>
-						<Select
-							itemComponent={props => (
-								<SelectItem item={props.item}>
-									{props.item.rawValue.label}
-								</SelectItem>
-							)}
-							options={[
-								{ label: t().settings.overlay.positionTop, value: 'top' },
-								{ label: t().settings.overlay.positionBottom, value: 'bottom' },
-								{ label: t().settings.overlay.positionCenter, value: 'center' },
-							]}
-							optionValue='value'
-							value={{ label: '', value: settingsStore.overlay_position }}
-							onChange={v =>
-								v &&
-								updateSettings({
-									overlay_position: v.value,
-								})
-							}
-						>
-							<SelectTrigger>
-								<SelectValue<SelectOption>>
-									{state => {
-										const opt = [
-											{ label: t().settings.overlay.positionTop, value: 'top' },
-											{ label: t().settings.overlay.positionBottom, value: 'bottom' },
-											{ label: t().settings.overlay.positionCenter, value: 'center' },
-										].find(o => o.value === state.selectedOption().value);
-										return opt?.label || '';
-									}}
-								</SelectValue>
-							</SelectTrigger>
-							<SelectContent />
-						</Select>
+						<div class='flex items-center justify-between'>
+							<label class='text-sm font-medium'>{t().settings.overlay.floatingDelay}</label>
+							<span class='text-xs text-neutral-500'>{settingsStore.floating_delay} мс</span>
+						</div>
+						<Slider
+							max={10000}
+							min={100}
+							step={100}
+							value={settingsStore.floating_delay}
+							onChange={(v) => updateSettings({ floating_delay: v })}
+						/>
+						<div class='flex justify-between text-xs text-neutral-500'>
+							<span>100 мс	</span>
+							<span>10 сек</span>
+						</div>
 					</div>
 
 					<div class='space-y-2'>
@@ -664,10 +663,16 @@ export const SettingsPage = () => {
 				</CardContent>
 			</Card>
 			{/* Сброс настроек */}
-			<Button class='w-full' variant='outline' onClick={handleResetSettings}>
-				<RotateCcw size={16} />
-				{t().settings.reset.button}
-			</Button>
+			<div class='flex flex-col gap-2'>
+				<Button class='w-full' variant='outline' onClick={handleResetSettings}>
+					<RotateCcw size={16} />
+					{t().settings.reset.button}
+				</Button>
+				<Button class='w-full' variant='outline' onClick={handleClearDictionary}>
+					<Trash size={16} />
+					{t().settings.dictionary.button}
+				</Button>
+			</div>
 			<BottomPadding/>
 		</div>
 	);

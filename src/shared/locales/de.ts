@@ -144,6 +144,7 @@ export const de: Locale = {
 			hideAfterShowDesc: 'Overlay nach Anzeige automatisch ausblenden',
 			soundEffects: 'Soundeffekte',
 			soundEffectsDesc: 'Sound bei Übersetzungsanzeige abspielen',
+			floatingDelay: 'Schwebende Verzögerung',
 		},
 		reset: {
 			button: 'Einstellungen auf Standard zurücksetzen',

@@ -144,6 +144,7 @@ export const zh: Locale = {
 			hideAfterShowDesc: '显示后自动隐藏覆盖层',
 			soundEffects: '音效',
 			soundEffectsDesc: '显示翻译时播放声音',
+			floatingDelay: '浮动延迟',
 		},
 		reset: {
 			button: '重置为默认设置',
