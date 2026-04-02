@@ -68,7 +68,7 @@ npm install
 npm run start
 
 # В новом терминале: запуск Tauri приложения
-npm run tauri dev
+cagro tauri dev
 ```
 
 ### Сборка релиза
@@ -78,7 +78,7 @@ npm run tauri dev
 npm run build
 
 # Сборка нативного приложения
-npm run tauri build
+cargo tauri build
 ```
 
 ---
@@ -172,28 +172,6 @@ Wnow использует SQLite для хранения:
 
 Интерфейс доступен на 10 языках:
 🇺🇸 English, 🇷🇺 Русский, 🇩🇪 Deutsch, 🇫🇷 Français, 🇪🇸 Español, 🇮🇹 Italiano, 🇵🇹 Português, 🇯🇵 日本語, 🇰🇷 한국어, 🇨🇳 中文
-
----
-
-## 📝 Лицензия
-
-MIT
-
----
-
-## 🤝 Вклад
-
-1. Fork репозиторий
-2. Создайте ветку (`git checkout -b feature/AmazingFeature`)
-3. Закоммитьте изменения (`git commit -m 'Add AmazingFeature'`)
-4. Отправьте в ветку (`git push origin feature/AmazingFeature`)
-5. Откройте Pull Request
-
----
-
-## 📧 Контакты
-
-- **GitHub:** [Issues](https://github.com/your-username/wnow/issues)
 
 ---
 
