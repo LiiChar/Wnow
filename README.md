@@ -64,9 +64,6 @@ npm install
 ### Запуск в режиме разработки
 
 ```bash
-# Запуск Vite dev-сервера
-npm run start
-
 # В новом терминале: запуск Tauri приложения
 cagro tauri dev
 ```
@@ -74,24 +71,9 @@ cagro tauri dev
 ### Сборка релиза
 
 ```bash
-# Сборка фронтенда
-npm run build
-
 # Сборка нативного приложения
 cargo tauri build
 ```
-
----
-
-## 📦 Доступные скрипты
-
-| Команда | Описание |
-|---------|----------|
-| `npm run start` | Запуск Vite dev-сервера |
-| `npm run dev` | Режим разработки |
-| `npm run build` | Сборка продакшн-версии |
-| `npm run tauri dev` | Запуск Tauri приложения |
-| `npm run tauri build` | Сборка релиза |
 
 ---
 
