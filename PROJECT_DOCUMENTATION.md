@@ -1,6 +1,6 @@
 # 📚 Wnow — Полная документация проекта
 
-**Дата обновления:** 29 марта 2026 г.  
+**Дата обновления:** 2 апреля 2026 г.
 **Версия приложения:** 0.1.0
 
 ---
@@ -20,6 +20,7 @@
 11. [API команды (Tauri)](#11-api-команды-tauri)
 12. [Компоненты фронтенда](#12-компоненты-фронтенда)
 13. [Модули бэкенда (Rust)](#13-модули-бэкенда-rust)
+14. [Контакты и поддержка](#14-контакты-и-поддержка)
 
 ---
 
@@ -68,9 +69,11 @@
 | **Перевод** | ct2rs 0.9.17 (CTranslate2) |
 | **Сеть** | reqwest, tokio |
 | **База данных** | rusqlite (SQLite) |
-| **Изображения** | image, imageproc, fast_image_resize, scrap |
-| **Ввод/вывод** | enigo (симуляция ввода), rdev (глобальные хоткеи) |
-| **Утилиты** | serde, dashmap, once_cell, regex, chrono |
+| **Изображения** | image, imageproc, fast_image_resize, scrap, xcap |
+| **Ввод/вывод** | enigo (симуляция ввода), rdev (глобальные хоткеи), keyboard |
+| **Шрифты** | rusttype, ab_glyph |
+| **Утилиты** | serde, dashmap, once_cell, regex, chrono, rand, strsim, base64, futures |
+| **Tauri плагины** | tauri-plugin-store, tauri-plugin-log, tauri-plugin-shell, tauri-plugin-clipboard-manager, tauri-plugin-notification, tauri-plugin-global-shortcut, tauri-plugin-opener |
 
 ---
 
@@ -87,9 +90,13 @@ E:\code\pet-project\Wnow\
 │   │   │   ├── model.rs             # Управление ML-моделями
 │   │   │   ├── translate.rs         # OCR + перевод области экрана
 │   │   │   ├── translation.rs       # Логика перевода (онлайн/офлайн)
+│   │   │   ├── monitor.rs           # Информация о мониторах
+│   │   │   ├── notification.rs      # Отправка уведомлений
+│   │   │   ├── text_replacement.rs  # Перевод с заменой текста
 │   │   │   └── mod.rs
 │   │   ├── 📁 handlers/             # Обработчики событий
 │   │   │   ├── show_translate.rs    # Показать перевод всего экрана
+│   │   │   ├── show_translate_with_replacement.rs  # Перевод с заменой
 │   │   │   ├── translate_word_at_cursor.rs  # Перевод слова под курсором
 │   │   │   ├── translate_selected_text.rs   # Перевод выделенного текста
 │   │   │   └── mod.rs
@@ -97,6 +104,7 @@ E:\code\pet-project\Wnow\
 │   │   │   └── capture.rs
 │   │   ├── 📁 mouse/                # Управление мышью
 │   │   │   └── mouse.rs
+│   │   ├── 📁 keyboard/             # Работа с клавиатурой
 │   │   ├── 📁 ocr/                  # Оптическое распознавание текста
 │   │   │   ├── ocr.rs               # Основной OCR движок
 │   │   │   ├── preproccesor.rs      # Предобработка изображений
@@ -110,6 +118,7 @@ E:\code\pet-project\Wnow\
 │   │   │   ├── database.rs          # SQLite операции
 │   │   │   ├── models.rs            # Модели данных
 │   │   │   └── mod.rs
+│   │   ├── 📁 source/               # Источники текста (буфер, выделение)
 │   │   ├── 📁 setup/                # Инициализация приложения
 │   │   │   ├── windows.rs           # Настройка окон
 │   │   │   ├── tray.rs              # Системный трей
@@ -127,20 +136,19 @@ E:\code\pet-project\Wnow\
 │   │   │   └── mod.rs
 │   │   ├── 📁 img/                  # Обработка изображений
 │   │   ├── 📁 windows/              # Управление окнами
+│   │   ├── 📁 notification/         # Система уведомлений
+│   │   │   ├── mod.rs
+│   │   │   └── notification.rs
+│   │   ├── 📁 overlay/              # Overlay компоненты (Rust)
 │   │   ├── main.rs                  # Точка входа
 │   │   └── lib.rs                   # Основной модуль
+│   ├── 📁 models/                   # ML модели (скачиваемые)
+│   │   ├── 📁 ocr/                  # OCR модели
+│   │   └── 📁 translate/            # Модели перевода
 │   ├── 📁 resources/                # Ресурсы приложения
 │   │   ├── 📁 dictionary/           # Словари для офлайн-перевода
 │   │   │   ├── en_ru.json           # Англо-русский словарь (6662 строки)
 │   │   │   └── ru_en.json           # Русско-английский словарь
-│   │   ├── 📁 ocr-model/            # Модели OCR
-│   │   │   ├── PP-OCRv5_mobile_det_fp16.mnn
-│   │   │   ├── cyrillic_PP-OCRv5_mobile_rec_infer.mnn
-│   │   │   ├── ppocr_keys_cyrillic.txt
-│   │   │   └── ocr-new/
-│   │   ├── 📁 translate-model/      # Модели перевода (скачиваемые)
-│   │   │   ├── en-ru/
-│   │   │   └── ru-en/
 │   │   └── debug_*.png              # Отладочные скриншоты
 │   ├── 📁 icons/                    # Иконки приложения
 │   ├── 📁 capabilities/             # Tauri permissions
@@ -153,9 +161,12 @@ E:\code\pet-project\Wnow\
 │   │   ├── 📁 main/
 │   │   │   ├── index.tsx            # Инициализация главного окна
 │   │   │   └── Main.tsx             # Корневой компонент
-│   │   └── 📁 overlay/
-│   │       ├── index.tsx            # Инициализация overlay окна
-│   │       └── Overlay.tsx          # Компонент overlay
+│   │   ├── 📁 overlay/
+│   │   │   ├── index.tsx            # Инициализация overlay окна
+│   │   │   └── Overlay.tsx          # Компонент overlay
+│   │   └── 📁 notification/
+│   │       ├── index.tsx            # Инициализация notification окна
+│   │       └── Notification.tsx     # Компонент notification
 │   ├── 📁 app/                      # Приложение
 │   │   ├── 📁 layout/
 │   │   │   ├── Layout.tsx           # Основной layout
@@ -194,15 +205,19 @@ E:\code\pet-project\Wnow\
 │   │   │   └── BottomPadding.tsx    # Отступ для навигации
 │   │   ├── 📁 model/
 │   │   │   └── ModelElement.tsx     # Элемент модели перевода
-│   │   └── 📁 toaster/
-│   │       └── ToastStatus.tsx      # Статус тоста
+│   │   ├── 📁 toaster/
+│   │   │   └── ToastStatus.tsx      # Статус тоста
+│   │   └── 📁 notification/
+│   │       └── Notification.tsx     # Компонент уведомления
 │   ├── 📁 widget/                   # Виджеты
 │   │   ├── 📁 overlay/
 │   │   │   └── TranslatorOverlay.tsx    # Основной overlay переводчика
 │   │   ├── 📁 settings/
 │   │   │   └── Models.tsx           # Управление моделями
-│   │   └── 📁 translate/
-│   │       └── Translate.tsx        # Виджет перевода текста
+│   │   ├── 📁 translate/
+│   │   │   └── Translate.tsx        # Виджет перевода текста
+│   │   └── 📁 notification/
+│   │       └── Notification.tsx     # Виджет уведомления
 │   ├── 📁 shared/                   # Общие модули
 │   │   ├── 📁 api/                  # API вызовы к бэкенду
 │   │   │   ├── log.ts
@@ -222,10 +237,15 @@ E:\code\pet-project\Wnow\
 │   │   ├── 📁 stores/               # Solid stores
 │   │   │   ├── layout.ts            # Состояние layout
 │   │   │   └── settings.ts          # Настройки приложения
-│   │   └── 📁 types/                # TypeScript типы
-│   │       ├── language.ts
-│   │       ├── ocr.ts               # Типы OCR (TextBox)
-│   │       └── storage.ts           # Типы БД (SavedWord, AppSettings)
+│   │   ├── 📁 types/                # TypeScript типы
+│   │   │   ├── language.ts
+│   │   │   ├── monitor.ts           # Типы мониторов
+│   │   │   ├── notification.ts      # Типы уведомлений
+│   │   │   ├── ocr.ts               # Типы OCR (TextBox)
+│   │   │   └── storage.ts           # Типы БД (SavedWord, AppSettings)
+│   │   └── 📁 locales/              # Локализация интерфейса
+│   │       ├── en.ts, ru.ts, de.ts, fr.ts, es.ts, it.ts, pt.ts, ja.ts, ko.ts, zh.ts
+│   │       └── index.ts
 │   ├── 📁 assets/
 │   │   ├── 📁 style/
 │   │   │   └── index.css            # Глобальные стили (Tailwind + CSS vars)
@@ -239,6 +259,7 @@ E:\code\pet-project\Wnow\
 │
 ├── index.html                       # Главное окно (словарь)
 ├── overlay.html                     # Overlay окно (перевод)
+├── notification.html                # Notification окно (уведомления)
 ├── package.json
 ├── tsconfig.json
 ├── tsconfig.node.json
@@ -312,6 +333,13 @@ E:\code\pet-project\Wnow\
 │  │  (SQLite)   │  │   (ML)      │  │  (Dict, OCR)       │   │
 │  └─────────────┘  └─────────────┘  └────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                   Notification Window                       │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │  Notification.tsx (Frontend) ←→ Rust Notification   │    │
+│  └─────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ### Поток данных
@@ -325,6 +353,14 @@ E:\code\pet-project\Wnow\
    - Сохраняет в БД
 4. **Backend** возвращает результат
 5. **Frontend** отображает перевод в overlay
+
+### Окна приложения
+
+| Окно | Файл | Назначение |
+|------|------|------------|
+| Main | `index.html` | Словарь, изучение, настройки |
+| Overlay | `overlay.html` | Перевод поверх экрана |
+| Notification | `notification.html` | Системные уведомления |
 
 ---
 
@@ -347,11 +383,16 @@ E:\code\pet-project\Wnow\
 - Захват всего экрана
 - Массовый OCR
 - Показ всех переведённых блоков
+- ⚠️ Функция закомментирована в `lib.rs`
 
 #### 6.1.4 Перевод выделенного текста (`Ctrl+Shift+C`)
 - Копирование через Ctrl+C
 - Перевод из буфера
 - Восстановление буфера
+
+#### 6.1.5 Перевод с заменой текста
+- Перевод фрагментов текста с заменой
+- Перевод изображений с заменой текста
 
 ### 6.2 Словарь
 - Автосохранение переведённых слов
@@ -374,6 +415,11 @@ E:\code\pet-project\Wnow\
 - **Горячие клавиши**: настраиваемые
 - **Модели**: скачивание ML-моделей для офлайн-перевода
 
+### 6.5 Уведомления
+- Системные уведомления через `tauri-plugin-notification`
+- Уведомления о событиях приложения
+- Кастомные уведомления из фронтенда
+
 ---
 
 ## 7. Горячие клавиши
@@ -382,9 +428,9 @@ E:\code\pet-project\Wnow\
 |----------|------------|-----------------|
 | Перевод слова под курсором | `Ctrl+U` | `src-tauri/src/handlers/translate_word_at_cursor.rs` |
 | Выделить область для перевода | `Ctrl+Y` | `src-tauri/src/handlers/show_translate.rs` |
-| Перевод всего экрана | `Ctrl+T` | `src-tauri/src/handlers/show_translate.rs` |
+| Перевод всего экрана | `Ctrl+T` | `src-tauri/src/handlers/show_translate.rs` (закомментировано) |
 | Перевод выделенного текста | `Ctrl+Shift+C` | `src-tauri/src/handlers/translate_selected_text.rs` |
-| Закрыть overlay | `Ctrl+I` | `src/windows/overlay/Overlay.tsx` |
+| Закрыть overlay | `Ctrl+I` | `src-tauri/src/lib.rs` |
 
 ---
 
@@ -409,7 +455,7 @@ E:\code\pet-project\Wnow\
 | Поле | Тип | Описание |
 |------|-----|----------|
 | key | TEXT | Ключ настройки |
-| value | TEXT | Значение |
+| value | TEXT | Значение (JSON) |
 
 #### Таблица `stats`
 | Поле | Тип | Описание |
@@ -479,12 +525,14 @@ cargo tauri build
 |------|------------|
 | `index.html` | Главное окно (словарь, настройки) |
 | `overlay.html` | Overlay окно (перевод поверх экрана) |
+| `notification.html` | Notification окно (уведомления) |
 
 ### Ключевые компоненты фронтенда
 | Файл | Назначение |
 |------|------------|
 | `src/windows/main/Main.tsx` | Корневой компонент главного окна |
 | `src/windows/overlay/Overlay.tsx` | Корневой компонент overlay |
+| `src/windows/notification/Notification.tsx` | Корневой компонент notification |
 | `src/widget/overlay/TranslatorOverlay.tsx` | Основной компонент перевода |
 | `src/pages/DictionaryPage.tsx` | Страница словаря |
 | `src/pages/StudyPage.tsx` | Страница изучения слов |
@@ -495,6 +543,7 @@ cargo tauri build
 |------|------------|
 | `src-tauri/src/lib.rs` | Основной модуль Rust |
 | `src-tauri/src/commands/translate.rs` | Команда перевода области |
+| `src-tauri/src/commands/text_replacement.rs` | Перевод с заменой текста |
 | `src-tauri/src/storage/database.rs` | Операции с SQLite |
 | `src-tauri/src/translation/translation.rs` | Логика онлайн-перевода |
 | `src-tauri/src/ocr/ocr.rs` | OCR движок |
@@ -504,8 +553,7 @@ cargo tauri build
 |------|------------|
 | `src-tauri/resources/dictionary/en_ru.json` | Англо-русский словарь |
 | `src-tauri/resources/dictionary/ru_en.json` | Русско-английский словарь |
-| `src-tauri/resources/ocr-model/` | Модели OCR |
-| `src-tauri/resources/translate-model/` | Модели перевода |
+| `src-tauri/models/` | ML модели (скачиваемые) |
 
 ---
 
@@ -514,30 +562,56 @@ cargo tauri build
 ### Команды перевода
 | Команда | Описание | Файл |
 |---------|----------|------|
-| `translate_area` | Перевод области экрана | `commands/translate.rs` |
-| `translate_word` | Перевод слова | `commands/translate.rs` |
+| `translate` | Перевод текста | `commands/translate.rs` |
+| `get_block_translate` | Получить перевод блока | `commands/translate.rs` |
+| `get_block_image_translate` | Получить перевод изображения | `commands/translate.rs` |
+| `stop_floating_translate` | Остановить плавающий перевод | `commands/translate.rs` |
+| `start_floating_translate` | Запустить плавающий перевод | `commands/translate.rs` |
+| `start_floating_image_translate` | Запустить плавающий перевод изображения | `commands/translate.rs` |
+| `quick_translate` | Быстрый перевод | `commands/common.rs` |
+| `batch_translate` | Пакетный перевод | `commands/common.rs` |
 | `translate_text` | Перевод текста | `commands/translation.rs` |
+| `translate_image_with_replacement` | Перевод изображения с заменой | `commands/text_replacement.rs` |
+| `translate_fragment` | Перевод фрагмента | `commands/text_replacement.rs` |
 
 ### Команды базы данных
 | Команда | Описание | Файл |
 |---------|----------|------|
-| `get_words` | Получить все слова | `commands/database.rs` |
-| `add_word` | Добавить слово | `commands/database.rs` |
+| `get_all_words` | Получить все слова | `commands/database.rs` |
+| `add_word_to_study` | Добавить слово | `commands/database.rs` |
 | `delete_word` | Удалить слово | `commands/database.rs` |
-| `update_word` | Обновить слово | `commands/database.rs` |
+| `update_word_progress` | Обновить прогресс слова | `commands/database.rs` |
+| `get_words_for_study` | Получить слова для изучения | `commands/database.rs` |
+| `get_learning_stats` | Получить статистику обучения | `commands/database.rs` |
+| `get_settings` | Получить настройки | `commands/database.rs` |
+| `save_settings` | Сохранить настройки | `commands/database.rs` |
 
 ### Команды моделей
 | Команда | Описание | Файл |
 |---------|----------|------|
-| `get_models` | Получить список моделей | `commands/model.rs` |
+| `get_model_list` | Получить список моделей | `commands/model.rs` |
+| `get_available_models` | Получить доступные модели | `commands/model.rs` |
 | `download_model` | Скачать модель | `commands/model.rs` |
-| `delete_model` | Удалить модель | `commands/model.rs` |
+| `get_translation_models` | Получить модели перевода | `commands/translation.rs` |
+| `is_model_available` | Проверить доступность модели | `commands/translation.rs` |
 
-### Команды настроек
+### Команды мониторов
 | Команда | Описание | Файл |
 |---------|----------|------|
-| `get_settings` | Получить настройки | `commands/common.rs` |
-| `save_settings` | Сохранить настройки | `commands/common.rs` |
+| `get_monitors` | Получить список мониторов | `commands/monitor.rs` |
+| `get_main_monitor` | Получить главный монитор | `commands/monitor.rs` |
+
+### Команды уведомлений
+| Команда | Описание | Файл |
+|---------|----------|------|
+| `show_notification` | Показать уведомление | `commands/notification.rs` |
+
+### Общие команды
+| Команда | Описание | Файл |
+|---------|----------|------|
+| `log` | Логирование | `commands/common.rs` |
+| `set_clickthrough` | Установить прозрачность кликов | `commands/common.rs` |
+| `get_mouse_position` | Получить позицию мыши | `commands/common.rs` |
 
 ---
 
@@ -557,6 +631,8 @@ cargo tauri build
 | `Combobox.tsx` | Комбобокс с поиском |
 | `HotkeyInput.tsx` | Ввод горячей клавиши |
 | `Toast.tsx` | Уведомление |
+| `Label.tsx` | Подпись для полей |
+| `Progres.tsx` | Индикатор прогресса |
 
 ### Виджеты (`src/widget/`)
 | Виджет | Назначение |
@@ -564,6 +640,7 @@ cargo tauri build
 | `TranslatorOverlay.tsx` | Overlay для показа перевода |
 | `Translate.tsx` | Форма ручного перевода |
 | `Models.tsx` | Управление ML-моделями |
+| `Notification.tsx` | Компонент уведомления |
 
 ### Хуки (`src/shared/hooks/`)
 | Хук | Назначение |
@@ -578,6 +655,29 @@ cargo tauri build
 | `layout.ts` | Состояние layout (заголовок, footer) |
 | `settings.ts` | Глобальные настройки приложения |
 
+### Типы (`src/shared/types/`)
+| Тип | Назначение |
+|-----|------------|
+| `language.ts` | Типы языков |
+| `ocr.ts` | Типы OCR (TextBox) |
+| `storage.ts` | Типы БД (SavedWord, AppSettings) |
+| `monitor.ts` | Типы мониторов |
+| `notification.ts` | Типы уведомлений |
+
+### Локализация (`src/shared/locales/`)
+| Язык | Файл |
+|------|------|
+| 🇺🇸 English | `en.ts` |
+| 🇷🇺 Русский | `ru.ts` |
+| 🇩🇪 Deutsch | `de.ts` |
+| 🇫🇷 Français | `fr.ts` |
+| 🇪🇸 Español | `es.ts` |
+| 🇮🇹 Italiano | `it.ts` |
+| 🇵🇹 Português | `pt.ts` |
+| 🇯🇵 日本語 | `ja.ts` |
+| 🇰🇷 한국어 | `ko.ts` |
+| 🇨🇳 中文 | `zh.ts` |
+
 ---
 
 ## 13. Модули бэкенда (Rust)
@@ -585,16 +685,20 @@ cargo tauri build
 ### Commands (`src-tauri/src/commands/`)
 | Модуль | Назначение |
 |--------|------------|
-| `common.rs` | Общие команды (лог, мышь, настройки) |
-| `database.rs` | CRUD операции с БД |
+| `common.rs` | Общие команды (лог, мышь, настройки, быстрый перевод) |
+| `database.rs` | CRUD операции с БД, статистика, настройки |
 | `model.rs` | Управление ML-моделями |
-| `translate.rs` | OCR + перевод области |
-| `translation.rs` | Логика перевода |
+| `translate.rs` | OCR + перевод области, плавающий перевод |
+| `translation.rs` | Логика перевода, режимы, модели |
+| `monitor.rs` | Информация о мониторах |
+| `notification.rs` | Отправка системных уведомлений |
+| `text_replacement.rs` | Перевод с заменой текста |
 
 ### Handlers (`src-tauri/src/handlers/`)
 | Модуль | Назначение |
 |--------|------------|
 | `show_translate.rs` | Обработчик перевода экрана |
+| `show_translate_with_replacement.rs` | Перевод с заменой текста |
 | `translate_word_at_cursor.rs` | Перевод слова под курсором |
 | `translate_selected_text.rs` | Перевод выделенного текста |
 
@@ -609,6 +713,8 @@ cargo tauri build
 | `storage/database.rs` | SQLite операции |
 | `capture/capture.rs` | Захват экрана |
 | `mouse/mouse.rs` | Управление мышью |
+| `source/` | Источники текста |
+| `img/` | Обработка изображений |
 
 ### Setup (`src-tauri/src/setup/`)
 | Модуль | Назначение |
@@ -618,9 +724,27 @@ cargo tauri build
 | `shortcuts.rs` | Горячие клавиши |
 | `database.rs` | Инициализация БД |
 
+### Platform (`src-tauri/src/platform/`)
+| Модуль | Назначение |
+|--------|------------|
+| `windows.rs` | Windows API (topmost окна) |
+| `macos.rs` | macOS специфичный код |
+| `linux.rs` | Linux специфичный код |
+
+### Utils (`src-tauri/src/utils/`)
+| Модуль | Назначение |
+|--------|------------|
+| `resource.rs` | Работа с ресурсами |
+| `hash.rs` | Хэш-функции |
+
+### Notification (`src-tauri/src/notification/`)
+| Модуль | Назначение |
+|--------|------------|
+| `notification.rs` | Логика уведомлений |
+
 ---
 
-## 📞 Контакты и поддержка
+## 14. Контакты и поддержка
 
 При возникновении вопросов обращайтесь к исходному коду:
 - **Фронтенд:** `src/` директория

@@ -3,8 +3,8 @@ import { createStore } from "solid-js/store";
 
 import type { AppSettings } from '../types/storage';
 
-import { log } from '../lib/log';
 import { getSettings, saveSettings } from '../api/settings';
+import { log } from '../lib/log';
 
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -31,6 +31,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   enable_sound: false,
   show_word_context: true,
   compact_mode: false,
+  ui_locale: 'ru',
 };
 
 const [settingsStore, setSettingsStore] = createStore<AppSettings>(DEFAULT_SETTINGS);

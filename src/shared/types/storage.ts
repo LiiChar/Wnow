@@ -60,6 +60,7 @@ export interface AppSettings {
   enable_sound: boolean;
   show_word_context: boolean;
   compact_mode: boolean;
+  ui_locale: 'ru' | 'en' | 'es' | 'de' | 'fr' | 'it' | 'pt' | 'zh' | 'ja' | 'ko';
 }
 
 export const LANGUAGES = [

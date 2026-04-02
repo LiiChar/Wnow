@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch, SwitchControl, SwitchLabel, SwitchThumb } from '@/components/ui/Switch';
 import { createToast } from '@/components/ui/Toast';
 import { getTranslationMode, setTranslationMode } from '@/shared/api/settings';
+import { getLocale, getPreferredLocale, setLocalePreference, SUPPORTED_LOCALES, useLocale } from '@/shared/lib/locale.tsx';
 import { useHeader } from '@/shared/hooks/useHeader';
 import { Models } from '@/widget/settings/Models';
 
@@ -81,13 +82,18 @@ const SwitchRow = (props: SwitchRowProps) => {
 
 export const SettingsPage = () => {
 	const [mode, setMode] = createSignal<string>('local_first');
+	const { locale, setLocale, t } = useLocale();
 
-	useHeader('Настройки', 'Персонализация приложения');
+	useHeader(t().settings.title, t().settings.description);
 
 	onMount(async () => {
 		try {
 			const mode = await getTranslationMode();
 			setMode(mode);
+			const preferredLocale = getPreferredLocale();
+			if (preferredLocale !== locale()) {
+				setLocale(preferredLocale);
+			}
 		} catch (e) {
 			console.error('Failed to get translation mode:', e);
 		}
@@ -102,17 +108,22 @@ export const SettingsPage = () => {
 		}
 	};
 
+	const handleLocaleChange = (code: string) => {
+		setLocale(code as any);
+		setLocalePreference(code as any);
+		updateSettings({ ui_locale: code as any });
+	};
 
 	const themeOptions: SelectOption[] = [
-		{ label: '🌙 Тёмная', value: 'dark' },
-		{ label: '☀️ Светлая', value: 'light' },
-		{ label: '💻 Системная', value: 'system' }
+		{ label: t().settings.appearance.themeDark, value: 'dark' },
+		{ label: t().settings.appearance.themeLight, value: 'light' },
+		{ label: t().settings.appearance.themeSystem, value: 'system' }
 	];
 
 	const translationModeOptions: SelectOption[] = [
-		{ label: '🔒 Онлайн (с офлайн fallback)', value: 'online_first' },
-		{ label: '🔐 Только офлайн', value: 'offline_only' },
-		{ label: '🌐 Только онлайн', value: 'online_only' },
+		{ label: t().settings.translationEngine.modeOnlineFirst, value: 'online_first' },
+		{ label: t().settings.translationEngine.modeOfflineOnly, value: 'offline_only' },
+		{ label: t().settings.translationEngine.modeOnlineOnly, value: 'online_only' },
 	];
 
 	const langOptions: SelectOption[] = LANGUAGES.map(l => ({
@@ -120,23 +131,28 @@ export const SettingsPage = () => {
 		value: l.code
 	}));
 
+	const localeOptions: SelectOption[] = SUPPORTED_LOCALES.map(l => ({
+		label: `${l.flag} ${l.name}`,
+		value: l.code
+	}));
+
 	const handleResetSettings = async () => {
-		// if (!confirm('Вы уверены, что хотите сбросить все настройки по умолчанию?')) {
+		// if (!confirm(t().settings.reset.confirmTitle)) {
 		// 	return;
 		// }
 
 		try {
 			await updateSettings(DEFAULT_SETTINGS);
 			createToast({
-				title: 'Настройки сброшены',
-				description: 'Все настройки возвращены к значениям по умолчанию',
+				title: t().settings.reset.success,
+				description: t().settings.reset.successDesc,
 				type: 'success'
 			});
 		} catch (e) {
 			console.error('Failed to reset settings:', e);
 			createToast({
-				title: 'Ошибка',
-				description: 'Не удалось сбросить настройки',
+				title: t().settings.reset.error,
+				description: t().settings.reset.errorDesc,
 				type: 'error'
 			});
 		}
@@ -152,9 +168,9 @@ export const SettingsPage = () => {
 							<Play size={16} />
 						</div>
 						<div class='min-w-0'>
-							<CardTitle class='text-base'>Запуск</CardTitle>
+							<CardTitle class='text-base'>{t().settings.launch.title}</CardTitle>
 							<CardDescription class='text-xs'>
-								Настройки запуска приложения
+								{t().settings.launch.description}
 							</CardDescription>
 						</div>
 					</div>
@@ -162,15 +178,15 @@ export const SettingsPage = () => {
 				<CardContent class='space-y-3'>
 					<SwitchRow
 						checked={settingsStore.start_minimized}
-						description='Приложение будет запускаться в фоновом режиме'
-						title='Запускать свёрнутым'
+						description={t().settings.launch.startMinimizedDesc}
+						title={t().settings.launch.startMinimized}
 						onChange={(v) => updateSettings({ start_minimized: v })}
 					/>
 
 					<SwitchRow
 						checked={settingsStore.auto_launch}
-						description='Автоматически запускать приложение при старте системы'
-						title='Автозапуск'
+						description={t().settings.launch.autoLaunchDesc}
+						title={t().settings.launch.autoLaunch}
 						onChange={(v) => updateSettings({ auto_launch: v })}
 					/>
 				</CardContent>
@@ -183,16 +199,16 @@ export const SettingsPage = () => {
 							<Palette size={16} />
 						</div>
 						<div class='min-w-0'>
-							<CardTitle class='text-base'>Внешний вид</CardTitle>
+							<CardTitle class='text-base'>{t().settings.appearance.title}</CardTitle>
 							<CardDescription class='text-xs'>
-								Настройки темы оформления
+								{t().settings.appearance.description}
 							</CardDescription>
 						</div>
 					</div>
 				</CardHeader>
 				<CardContent class='space-y-4'>
 					<div class='space-y-2'>
-						<label class='text-sm font-medium'>Тема</label>
+						<label class='text-sm font-medium'>{t().settings.appearance.theme}</label>
 						<Select
 							itemComponent={props => (
 								<SelectItem item={props.item}>
@@ -218,9 +234,9 @@ export const SettingsPage = () => {
 							<SelectContent />
 						</Select>
 					</div>
-					
+
 					<div class='space-y-2'>
-						<label class='text-sm font-medium'>Размер шрифта</label>
+						<label class='text-sm font-medium'>{t().settings.appearance.fontSize}</label>
 						<Select
 							itemComponent={props => (
 								<SelectItem item={props.item}>
@@ -228,9 +244,9 @@ export const SettingsPage = () => {
 								</SelectItem>
 							)}
 							options={[
-								{ label: 'Маленький', value: 'small' },
-								{ label: 'Средний', value: 'medium' },
-								{ label: 'Большой', value: 'large' },
+								{ label: t().settings.appearance.fontSizeSmall, value: 'small' },
+								{ label: t().settings.appearance.fontSizeMedium, value: 'medium' },
+								{ label: t().settings.appearance.fontSizeLarge, value: 'large' },
 							]}
 							optionValue='value'
 							value={{ label: '', value: settingsStore.font_size }}
@@ -245,9 +261,9 @@ export const SettingsPage = () => {
 								<SelectValue<SelectOption>>
 									{state => {
 										const opt = [
-											{ label: 'Маленький', value: 'small' },
-											{ label: 'Средний', value: 'medium' },
-											{ label: 'Большой', value: 'large' },
+											{ label: t().settings.appearance.fontSizeSmall, value: 'small' },
+											{ label: t().settings.appearance.fontSizeMedium, value: 'medium' },
+											{ label: t().settings.appearance.fontSizeLarge, value: 'large' },
 										].find(o => o.value === state.selectedOption().value);
 										return opt?.label || '';
 									}}
@@ -256,11 +272,11 @@ export const SettingsPage = () => {
 							<SelectContent />
 						</Select>
 					</div>
-					
+
 					<SwitchRow
 						checked={settingsStore.compact_mode}
-						description='Уменьшить отступы и размеры элементов'
-						title='Компактный режим'
+						description={t().settings.appearance.compactModeDesc}
+						title={t().settings.appearance.compactMode}
 						onChange={(v) => updateSettings({ compact_mode: v })}
 					/>
 				</CardContent>
@@ -273,16 +289,16 @@ export const SettingsPage = () => {
 							<Languages size={16} />
 						</div>
 						<div class='min-w-0'>
-							<CardTitle class='text-base'>Языки</CardTitle>
+							<CardTitle class='text-base'>{t().settings.languages.title}</CardTitle>
 							<CardDescription class='text-xs'>
-								Языки перевода по умолчанию
+								{t().settings.languages.description}
 							</CardDescription>
 						</div>
 					</div>
 				</CardHeader>
 				<CardContent class='space-y-4'>
 					<div class='space-y-2'>
-						<label class='text-sm font-medium'>Исходный язык</label>
+						<label class='text-sm font-medium'>{t().settings.languages.sourceLanguage}</label>
 						<Select
 							itemComponent={props => (
 								<SelectItem item={props.item}>
@@ -304,7 +320,7 @@ export const SettingsPage = () => {
 						</Select>
 					</div>
 					<div class='space-y-2'>
-						<label class='text-sm font-medium'>Целевой язык</label>
+						<label class='text-sm font-medium'>{t().settings.languages.targetLanguage}</label>
 						<Select
 							itemComponent={props => (
 								<SelectItem item={props.item}>
@@ -316,6 +332,28 @@ export const SettingsPage = () => {
 							optionValue='value'
 							value={langOptions.find(o => o.value === settingsStore.target_lang)}
 							onChange={v => v && updateSettings({ target_lang: v.value })}
+						>
+							<SelectTrigger>
+								<SelectValue<SelectOption>>
+									{state => state.selectedOption().label}
+								</SelectValue>
+							</SelectTrigger>
+							<SelectContent />
+						</Select>
+					</div>
+					<div class='space-y-2 pt-2 border-t border-border'>
+						<label class='text-sm font-medium'>Язык интерфейса</label>
+						<Select
+							itemComponent={props => (
+								<SelectItem item={props.item}>
+									{props.item.rawValue.label}
+								</SelectItem>
+							)}
+							options={localeOptions}
+							optionTextValue='label'
+							optionValue='value'
+							value={localeOptions.find(o => o.value === locale())}
+							onChange={v => v && handleLocaleChange(v.value)}
 						>
 							<SelectTrigger>
 								<SelectValue<SelectOption>>
@@ -337,9 +375,9 @@ export const SettingsPage = () => {
 							<Languages size={16} />
 						</div>
 						<div class='min-w-0'>
-							<CardTitle class='text-base'>Движок перевода</CardTitle>
+							<CardTitle class='text-base'>{t().settings.translationEngine.title}</CardTitle>
 							<CardDescription class='text-xs'>
-								Настройки движка перевода
+								{t().settings.translationEngine.description}
 							</CardDescription>
 						</div>
 					</div>
@@ -347,12 +385,12 @@ export const SettingsPage = () => {
 				<CardContent class='space-y-4'>
 					<SwitchRow
 						checked={settingsStore.image_replacement}
-						description='Заменять изначальный текст на переведённый'
-						title='Заменять текст'
+						description={t().settings.translationEngine.replaceTextDesc}
+						title={t().settings.translationEngine.replaceText}
 						onChange={(v) => updateSettings({ image_replacement: v })}
 					/>
 					<div class='space-y-2'>
-						<label class='text-sm font-medium'>Режим перевода</label>
+						<label class='text-sm font-medium'>{t().settings.translationEngine.mode}</label>
 						<Select
 							itemComponent={props => (
 								<SelectItem item={props.item}>
@@ -377,16 +415,13 @@ export const SettingsPage = () => {
 					</div>
 					<div class='text-xs text-muted-foreground space-y-1.5 bg-muted rounded-lg p-3'>
 						<p>
-							<strong>🔒 Локальный:</strong> Встроенный словарь + онлайн если
-							слово не найдено
+							<strong>{t().settings.translationEngine.localMode}</strong> {t().settings.translationEngine.localModeDesc}
 						</p>
 						<p>
-							<strong>🔐 Только офлайн:</strong> Только встроенный словарь
-							(приватность)
+							<strong>{t().settings.translationEngine.offlineMode}</strong> {t().settings.translationEngine.offlineModeDesc}
 						</p>
 						<p>
-							<strong>🌐 Только онлайн:</strong> Google Translate (точнее, но
-							нужен интернет)
+							<strong>{t().settings.translationEngine.onlineMode}</strong> {t().settings.translationEngine.onlineModeDesc}
 						</p>
 					</div>
 					<div class='p-3  border border-emerald-800/50 rounded-lg'>
@@ -394,11 +429,10 @@ export const SettingsPage = () => {
 							<Sparkles class='text-emerald-400 -mt-2' size={40} />
 							<div>
 								<div class='text-xs text-emerald-400 font-medium mb-0.5'>
-									Рекомендация
+									{t().settings.translationEngine.recommendation}
 								</div>
 								<p class='text-xs '>
-									Режим "Локальный" обеспечивает быстрый перевод частых слов
-									офлайн, а для сложных фраз использует онлайн-перевод.
+									{t().settings.translationEngine.recommendationText}
 								</p>
 							</div>
 						</div>
@@ -413,9 +447,9 @@ export const SettingsPage = () => {
 							<KeyRound size={16} />
 						</div>
 						<div class='min-w-0'>
-							<CardTitle class='text-base'>Горячие клавиши</CardTitle>
+							<CardTitle class='text-base'>{t().settings.hotkeys.title}</CardTitle>
 							<CardDescription class='text-xs'>
-								Кликните на комбинацию для изменения
+								{t().settings.hotkeys.description}
 							</CardDescription>
 						</div>
 					</div>
@@ -424,7 +458,7 @@ export const SettingsPage = () => {
 					<div class='flex items-start gap-3 p-0 py-1 '>
 						<div class='flex-1'>
 							<HotkeyInput
-								label='Перевод слова под курсором'
+								label={t().settings.hotkeys.translateWord}
 								value={settingsStore.hotkey_translate_word}
 								onChange={v => updateSettings({ hotkey_translate_word: v })}
 							/>
@@ -434,7 +468,7 @@ export const SettingsPage = () => {
 					<div class='flex items-start gap-3 p-0 py-1 '>
 						<div class='flex-1'>
 							<HotkeyInput
-								label='Выделить область'
+								label={t().settings.hotkeys.translateArea}
 								value={settingsStore.hotkey_translate_area}
 								onChange={v => updateSettings({ hotkey_translate_area: v })}
 							/>
@@ -444,7 +478,7 @@ export const SettingsPage = () => {
 					<div class='flex items-start gap-3 p-0 py-1 '>
 						<div class='flex-1'>
 							<HotkeyInput
-								label='Перевод всего экрана'
+								label={t().settings.hotkeys.translateScreen}
 								value={settingsStore.hotkey_translate_screen}
 								onChange={v => updateSettings({ hotkey_translate_screen: v })}
 							/>
@@ -454,7 +488,7 @@ export const SettingsPage = () => {
 					<div class='flex items-start gap-3 p-0 py-1 '>
 						<div class='flex-1'>
 							<HotkeyInput
-								label='Перевод выделенного текста'
+								label={t().settings.hotkeys.translateClipboard}
 								value={settingsStore.hotkey_translate_clipboard}
 								onChange={v =>
 									updateSettings({ hotkey_translate_clipboard: v })
@@ -464,8 +498,7 @@ export const SettingsPage = () => {
 					</div>
 
 					<p class='text-xs text-neutral-500 pt-2 border-t border-border'>
-						* Изменения горячих клавиш вступят в силу после перезапуска
-						приложения
+						{t().settings.hotkeys.restartRequired}
 					</p>
 				</CardContent>
 			</Card>
@@ -477,9 +510,9 @@ export const SettingsPage = () => {
 							<Bell size={16} />
 						</div>
 						<div class='min-w-0'>
-							<CardTitle class='text-base'>Поведение</CardTitle>
+							<CardTitle class='text-base'>{t().settings.behavior.title}</CardTitle>
 							<CardDescription class='text-xs'>
-								Настройки поведения приложения
+								{t().settings.behavior.description}
 							</CardDescription>
 						</div>
 					</div>
@@ -487,33 +520,33 @@ export const SettingsPage = () => {
 				<CardContent class='space-y-3'>
 					<SwitchRow
 						checked={settingsStore.auto_save_words}
-						description='Автоматически сохранять переведённые слова в словарь'
+						description={t().settings.behavior.autoSaveWordsDesc}
 						icon={Save}
-						title='Автосохранение слов'
+						title={t().settings.behavior.autoSaveWords}
 						onChange={(v) => updateSettings({ auto_save_words: v })}
 					/>
 
 					<SwitchRow
 						checked={settingsStore.show_notifications}
-						description='Показывать уведомления о событиях'
+						description={t().settings.behavior.notificationsDesc}
 						icon={Bell}
-						title='Уведомления'
+						title={t().settings.behavior.notifications}
 						onChange={(v) => updateSettings({ show_notifications: v })}
 					/>
 
 					<SwitchRow
 						checked={settingsStore.minimize_to_tray}
-						description='Скрывать приложение в системный трей при сворачивании'
+						description={t().settings.behavior.minimizeToTrayDesc}
 						icon={Monitor}
-						title='Сворачивать в трей'
+						title={t().settings.behavior.minimizeToTray}
 						onChange={(v) => updateSettings({ minimize_to_tray: v })}
 					/>
 
 					<SwitchRow
 						checked={settingsStore.show_word_context}
-						description='Отображать контекст предложения для слов'
+						description={t().settings.behavior.showContextDesc}
 						icon={Eye}
-						title='Показывать контекст'
+						title={t().settings.behavior.showContext}
 						onChange={(v) => updateSettings({ show_word_context: v })}
 					/>
 				</CardContent>
@@ -527,9 +560,9 @@ export const SettingsPage = () => {
 							<Layers size={16} />
 						</div>
 						<div class='min-w-0'>
-							<CardTitle class='text-base'>Overlay (перевод)</CardTitle>
+							<CardTitle class='text-base'>{t().settings.overlay.title}</CardTitle>
 							<CardDescription class='text-xs'>
-								Настройки отображения перевода
+								{t().settings.overlay.description}
 							</CardDescription>
 						</div>
 					</div>
@@ -537,7 +570,7 @@ export const SettingsPage = () => {
 				<CardContent class='space-y-4'>
 					<div class='space-y-2'>
 						<div class='flex items-center justify-between'>
-							<label class='text-sm font-medium'>Прозрачность фона</label>
+							<label class='text-sm font-medium'>{t().settings.overlay.backgroundOpacity}</label>
 							<span class='text-xs text-neutral-500'>{settingsStore.overlay_opacity}%</span>
 						</div>
 						<Slider
@@ -548,9 +581,9 @@ export const SettingsPage = () => {
 							onChange={(v) => updateSettings({ overlay_opacity: v })}
 						/>
 					</div>
-					
+
 					<div class='space-y-2'>
-						<label class='text-sm font-medium'>Позиция overlay</label>
+						<label class='text-sm font-medium'>{t().settings.overlay.position}</label>
 						<Select
 							itemComponent={props => (
 								<SelectItem item={props.item}>
@@ -558,9 +591,9 @@ export const SettingsPage = () => {
 								</SelectItem>
 							)}
 							options={[
-								{ label: '⬆️ Сверху', value: 'top' },
-								{ label: '⬇️ Снизу', value: 'bottom' },
-								{ label: '↕️ По центру', value: 'center' },
+								{ label: t().settings.overlay.positionTop, value: 'top' },
+								{ label: t().settings.overlay.positionBottom, value: 'bottom' },
+								{ label: t().settings.overlay.positionCenter, value: 'center' },
 							]}
 							optionValue='value'
 							value={{ label: '', value: settingsStore.overlay_position }}
@@ -575,9 +608,9 @@ export const SettingsPage = () => {
 								<SelectValue<SelectOption>>
 									{state => {
 										const opt = [
-											{ label: '⬆️ Сверху', value: 'top' },
-											{ label: '⬇️ Снизу', value: 'bottom' },
-											{ label: '↕️ По центру', value: 'center' },
+											{ label: t().settings.overlay.positionTop, value: 'top' },
+											{ label: t().settings.overlay.positionBottom, value: 'bottom' },
+											{ label: t().settings.overlay.positionCenter, value: 'center' },
 										].find(o => o.value === state.selectedOption().value);
 										return opt?.label || '';
 									}}
@@ -586,10 +619,10 @@ export const SettingsPage = () => {
 							<SelectContent />
 						</Select>
 					</div>
-					
+
 					<div class='space-y-2'>
 						<div class='flex items-center justify-between'>
-							<label class='text-sm font-medium'>Время показа (мс)</label>
+							<label class='text-sm font-medium'>{t().settings.overlay.duration}</label>
 							<span class='text-xs text-neutral-500'>{settingsStore.overlay_duration} мс</span>
 						</div>
 						<Slider
@@ -604,28 +637,28 @@ export const SettingsPage = () => {
 							<span>30 сек</span>
 						</div>
 					</div>
-					
+
 					<SwitchRow
 						checked={settingsStore.auto_copy_translation}
-						description='Копировать перевод в буфер обмена'
+						description={t().settings.overlay.autoCopyDesc}
 						icon={Copy}
-						title='Автокопирование'
+						title={t().settings.overlay.autoCopy}
 						onChange={(v) => updateSettings({ auto_copy_translation: v })}
 					/>
 
 					<SwitchRow
 						checked={settingsStore.hide_after_translation}
-						description='Автоматически скрывать overlay после показа'
+						description={t().settings.overlay.hideAfterShowDesc}
 						icon={EyeOff}
-						title='Скрывать после показа'
+						title={t().settings.overlay.hideAfterShow}
 						onChange={(v) => updateSettings({ hide_after_translation: v })}
 					/>
 
 					<SwitchRow
 						checked={settingsStore.enable_sound}
-						description='Воспроизводить звук при показе перевода'
+						description={t().settings.overlay.soundEffectsDesc}
 						icon={Volume2}
-						title='Звуковые эффекты'
+						title={t().settings.overlay.soundEffects}
 						onChange={(v) => updateSettings({ enable_sound: v })}
 					/>
 				</CardContent>
@@ -633,7 +666,7 @@ export const SettingsPage = () => {
 			{/* Сброс настроек */}
 			<Button class='w-full' variant='outline' onClick={handleResetSettings}>
 				<RotateCcw size={16} />
-				Сбросить настройки по умолчанию
+				{t().settings.reset.button}
 			</Button>
 			<BottomPadding/>
 		</div>

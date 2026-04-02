@@ -1,5 +1,4 @@
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
-import { Check, Copy, FoldVertical, Trash } from 'lucide-solid';
 import {
 	createSignal,
 	onCleanup,
@@ -7,7 +6,7 @@ import {
 	Show,
 } from 'solid-js';
 
-import { showNotification } from '@/shared/api/notification';
+import { getSettings } from '@/shared/api/settings';
 import { getBlockImageTranslate, getBlockTranslate } from '@/shared/api/translate';
 import { listener } from '@/shared/lib/listener';
 import { log } from '@/shared/lib/log';
@@ -19,15 +18,11 @@ import type { TextBox } from '../../shared/types/ocr';
 import { BoxCanvas } from '../../components/box/BoxCanvas';
 import { FloatingTranslation  } from '../../components/overlay/FloatingTranslation';
 import { SelectionArea } from '../../components/overlay/SelectionArea';
-import { getSettings } from '@/shared/api/settings';
 
 export const TranslatorOverlay = () => {
 	const [isSelectFragment, setIsSelectFragment] = createSignal(false);
 	const [boxes, setBoxes] = createSignal<TextBox[]>([]);
 	const [fullText, setFullText] = createSignal('');
-	const [showFullTranslation, setShowFullTranslation] = createSignal(false);
-	const [fullCopied, setFullCopied] = createSignal(false);
-	const [isCompactMode, setIsCompactMode] = createSignal(true);
 
 	const [floatingTranslation, setFloatingTranslation] =
 		createSignal<FloatingTranslationType | null>(null);
@@ -42,7 +37,6 @@ export const TranslatorOverlay = () => {
 		add<TextBox[]>('show_translate', ({ payload }) => {
 			log.info(`[LAYOUT][EVENT][show_translate]Listened to show_translate event with payload: ${  JSON.stringify(payload)}`);
 			setBoxes(payload);
-			setShowFullTranslation(false);
 			setCursorEvents(true);
 		});
 
@@ -50,7 +44,6 @@ export const TranslatorOverlay = () => {
 		add<TextBox[]>('show_translate_fragments', ({ payload }) => {
 			log.info('[LAYOUT][EVENT][show_translate_fragments] Received translated image');
 			setBoxes(payload);
-			setShowFullTranslation(false);
 			setCursorEvents(true);
 		});
 
@@ -72,7 +65,6 @@ export const TranslatorOverlay = () => {
 	const closeAll = () => {
 		if (!isSelectFragment() && floatingTranslation() === null) {
 			setBoxes([]);
-			setShowFullTranslation(false);
 			setFullText('');
 			setFloatingTranslation(null);
 			setCursorEvents(false);
@@ -80,25 +72,9 @@ export const TranslatorOverlay = () => {
 	};
 
 
-	const copyFullText = async () => {
-		navigator.clipboard.writeText(fullText());
-		setFullCopied(true);
-
-		await showNotification({
-			title: 'Скопировано',
-			text: 'Текст был скопирован в буфер обмена',
-			duration: 2000,
-		});
-
-		setTimeout(setFullCopied, 2000, false);
-	};
-
-
 
 	return (
 			<main class='fixed inset-0 z-9998' onClick={closeAll}>
-				
-
 				<Show when={boxes().length > 0}>
 					<BoxCanvas boxes={boxes} text={fullText}/>
 				</Show>
@@ -157,7 +133,6 @@ export const TranslatorOverlay = () => {
 									}));
 
 									setBoxes(adjusted);
-									setShowFullTranslation(true);
 									setCursorEvents(true);
 								}
 							} catch (e) {

@@ -85,7 +85,7 @@ export const Translate = () => {
   };
 
   return (
-		<div class='flex h-full w-full flex-col bg-background border border-border rounded-lg overflow-hidden min-h-38.5'>
+		<div class='flex h-full w-full flex-col bg-background border border-border rounded-lg overflow-hidden min-h-38.5 max-h-38.5'>
 			<div class='flex items-center justify-between pb-1'>
 				<div class='flex justify-between items-center w-full gap-2'>
 					<select
@@ -229,17 +229,21 @@ export const Translate = () => {
 							class={cn(
 								'h-7 w-7 p-0 hover:bg-accent',
 							)}
-							disabled={!sourceText()} 
+							disabled={!sourceText()}
 							size='sm'
 							variant='ghost'
 							onClick={async () => {
-								await addWordToStudy(
-									sourceText(),
-									translatedText(),
-									null,
-								);
-								setAdded(true);
-								setTimeout(setAdded, 2000, false);
+								try {
+									await addWordToStudy(
+										sourceText(),
+										translatedText(),
+										null,
+									);
+									setAdded(true);
+									setTimeout(setAdded, 2000, false);
+								} catch (e) {
+									console.error('Failed to add word:', e);
+								}
 							}}
 						>
 							<Show fallback={<Plus class='h-3.5 w-3.5' />} when={isAdded()}>

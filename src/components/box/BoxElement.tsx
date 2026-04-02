@@ -36,18 +36,26 @@ export const BoxElement = (props: BoxElementProps) => {
 
 	const handleAddToStudy = async () => {
 		try {
-			addWordToStudy(
+			await addWordToStudy(
 				props.box.text,
 				props.box.translation ?? props.box.text,
 				props.box
 					.id ? `http://asset.localhost/resources/screenshots/debug_${props.box.id}.png` : null,
+				props.box.context,
+				props.box.context_translation,
 			);
-		} catch (e) {
+			showNotification({
+				status: 'success',
+				title: 'Добавлено',
+				text: 'Слово добавлено в словарь',
+				duration: 2000,
+			});
+		} catch (e: any) {
 			console.error('Failed to add word:', e);
 			showNotification({
 				status: 'error',
 				title: 'Ошибка',
-				text: 'Не удалось добавить слово',
+				text: e.message || 'Не удалось добавить слово',
 				duration: 2000,
 			});
 		}

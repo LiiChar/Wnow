@@ -5,13 +5,21 @@ export const addWordToStudy = async (
 	text: string,
 	translation: string,
 	screenshotPath: string | null,
+	context?: string,
+	contextTranslation?: string,
 ) => {
+	// Валидация: слово не должно быть пустым
+	const trimmedText = text.trim();
+	if (!trimmedText) {
+		throw new Error('Слово не может быть пустым');
+	}
+	
 	await invoke('add_word_to_study', {
-		word: text,
-		translation: translation,
-		context: '',
-		contextTranslation: '',
-		screenshotPath: null,
+		word: trimmedText,
+		translation: translation.trim(),
+		context: context?.trim() ?? '',
+		contextTranslation: contextTranslation?.trim() ?? '',
+		screenshotPath: screenshotPath,
 	});
 };
 

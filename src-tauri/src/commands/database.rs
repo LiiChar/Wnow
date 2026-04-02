@@ -1,4 +1,5 @@
 use crate::storage::{AppSettings, Database, FlashcardWord, LearningStats, SavedWord};
+use crate::ActiveShortcuts;
 use tauri::Manager;
 
 // ===== КОМАНДЫ ДЛЯ БАЗЫ ДАННЫХ =====
@@ -11,10 +12,15 @@ pub async fn add_word_to_study(
     context: String,
     context_translation: String,
     screenshot_path: Option<String>,
-    app: tauri::AppHandle,
 ) -> Result<i64, String> {
+    // Валидация: слово не должно быть пустым
+    let trimmed_word = word.trim();
+    if trimmed_word.is_empty() {
+        return Err("Слово не может быть пустым".to_string());
+    }
+    
     Database::add_word(
-        &word,
+        trimmed_word,
         &translation,
         &context,
         &context_translation,
@@ -62,6 +68,17 @@ pub async fn get_settings() -> AppSettings {
 
 /// Сохранить настройки
 #[tauri::command]
-pub async fn save_settings(settings: AppSettings) -> Result<(), String> {
-    Database::save_all_settings(&settings)
+pub async fn save_settings(settings: AppSettings, app: tauri::AppHandle) -> Result<(), String> {
+    Database::save_all_settings(&settings)?;
+    
+    // Обновляем шорткаты в глобальном состоянии
+    let shortcut_state = ActiveShortcuts::from_settings(&settings);
+    let state_arc = app.state::<std::sync::Arc<std::sync::Mutex<ActiveShortcuts>>>();
+    let mut state = state_arc.lock().map_err(|e| format!("Failed to lock shortcut state: {}", e))?;
+    *state = shortcut_state;
+    
+    // Перерегистрируем шорткаты
+    crate::setup::register_shortcuts_from_settings(&app, &settings);
+    
+    Ok(())
 }

@@ -4,10 +4,12 @@ import {X} from 'lucide-solid'
 import { Show } from 'solid-js';
 
 import { Button } from '@/components/ui/Button';
+import { useLocale } from '@/shared/lib/locale.tsx';
 import { layoutStore } from '@/shared/stores/layout';
 
 
 export const Header = () => {
+	const { t } = useLocale();
 
   const handleCloseApp = async () => {
     try {

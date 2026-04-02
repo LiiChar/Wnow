@@ -1,7 +1,8 @@
 import { onMount } from "solid-js";
 
 import { Router } from '../../app/router/Router';
-import { applyTheme, initSettings } from "../../shared/stores/settings";
+import { LocaleProvider } from '../../shared/lib/locale.tsx';
+import { applyTheme, initSettings, settingsStore } from "../../shared/stores/settings";
 
 import '../../assets/style/index.css';
 
@@ -15,7 +16,9 @@ const Main = () => {
 	});
 
 	return (
-		<Router />
+		<LocaleProvider initialLocale={settingsStore.ui_locale}>
+			<Router />
+		</LocaleProvider>
 	);
 }
 

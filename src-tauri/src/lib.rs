@@ -13,9 +13,11 @@ mod translation;
 mod utils;
 mod windows;
 
+use std::sync::{Arc, Mutex};
+
 use tauri::Emitter;
 use tauri::Manager;
-use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutState as GlobalShortcutState};
 
 pub use handlers::{
     show_translate, show_translate_with_replacement, translate_selected_text,
@@ -26,82 +28,99 @@ pub use utils::{get_resource_dir, init_resource_dir};
 pub use windows::windows::create_main_window;
 
 use crate::commands::translate::stop_floating_translate;
-use crate::setup::register_shortcut_handler;
+use crate::setup::register_shortcuts_from_settings;
+use crate::storage::AppSettings;
+use crate::utils::parse_hotkey;
 use crate::windows::windows::create_notification_window;
 use crate::windows::windows::create_overlay_window;
 
+/// Хранит текущие шорткаты для динамического обновления
+pub struct ActiveShortcuts {
+    pub translate_screen: Shortcut,
+    pub translate_area: Shortcut,
+    pub translate_word: Shortcut,
+    pub translate_clipboard: Shortcut,
+    pub close_translate: Shortcut,
+}
+
+impl ActiveShortcuts {
+    pub fn from_settings(settings: &AppSettings) -> Self {
+        Self {
+            translate_screen: parse_hotkey(&settings.hotkey_translate_screen)
+                .unwrap_or_else(|| Shortcut::new(Some(Modifiers::CONTROL), Code::KeyT)),
+            translate_area: parse_hotkey(&settings.hotkey_translate_area)
+                .unwrap_or_else(|| Shortcut::new(Some(Modifiers::CONTROL), Code::KeyY)),
+            translate_word: parse_hotkey(&settings.hotkey_translate_word)
+                .unwrap_or_else(|| Shortcut::new(Some(Modifiers::CONTROL), Code::KeyU)),
+            translate_clipboard: parse_hotkey(&settings.hotkey_translate_clipboard)
+                .unwrap_or_else(|| Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyC)),
+            close_translate: Shortcut::new(Some(Modifiers::CONTROL), Code::KeyI),
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let ctrl_t = Shortcut::new(Some(Modifiers::CONTROL), Code::KeyT);
-    let ctrl_y = Shortcut::new(Some(Modifiers::CONTROL), Code::KeyY);
-    let ctrl_u = Shortcut::new(Some(Modifiers::CONTROL), Code::KeyU);
-    let ctrl_i = Shortcut::new(Some(Modifiers::CONTROL), Code::KeyI);
-    let ctrl_shift_c = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyC);
-
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(move |app, shortcut, event| {
-                    if shortcut == &ctrl_y {
-                        match event.state() {
-                            ShortcutState::Released => {
-                                if let Some(overlay) = app.get_webview_window("overlay") {
-                                    overlay.set_ignore_cursor_events(false).ok();
-                                    overlay.set_focus().ok();
-                                    set_window_topmost(&overlay);
+                .with_handler({
+                    move |app, shortcut, event| {
+                        // Пытаемся получить состояние шорткатов, если оно ещё не инициализировано - игнорируем
+                        let state_result = app.try_state::<std::sync::Arc<std::sync::Mutex<ActiveShortcuts>>>();
+                        if let Some(state_arc) = state_result {
+                            let state = state_arc.lock().unwrap();
+                            
+                            if shortcut == &state.translate_area {
+                                match event.state() {
+                                    GlobalShortcutState::Released => {
+                                        if let Some(overlay) = app.get_webview_window("overlay") {
+                                            overlay.set_ignore_cursor_events(false).ok();
+                                            overlay.set_focus().ok();
+                                            set_window_topmost(&overlay);
+                                        }
+                                        app.emit_to("overlay", "translate_fragment", ())
+                                            .expect("Failed send data by emit:show_translate");
+                                    }
+                                    _ => {}
                                 }
-                                app.emit_to("overlay", "translate_fragment", ())
-                                    .expect("Failed send data by emit:show_translate");
                             }
-                            _ => {}
-                        }
-                    }
-                    // if shortcut == &ctrl_t {
-                    //     match event.state() {
-                    //         ShortcutState::Released => {
-                    //             let app_clone = app.clone();
-                    //             std::thread::spawn(move || {
-                    //                 let rt = tokio::runtime::Runtime::new().unwrap();
-                    //                 rt.block_on(show_translate_with_replacement(&app_clone));
-                    //             });
-                    //         }
-                    //         _ => {}
-                    //     }
-                    // }
-                    if shortcut == &ctrl_u {
-                        match event.state() {
-                            ShortcutState::Released => {
-                                let app_clone = app.clone();
-                                std::thread::spawn(move || {
-                                    let rt = tokio::runtime::Runtime::new().unwrap();
-                                    rt.block_on(translate_word_at_cursor(&app_clone));
-                                });
+                            if shortcut == &state.translate_word {
+                                match event.state() {
+                                    GlobalShortcutState::Released => {
+                                        let app_clone = app.clone();
+                                        std::thread::spawn(move || {
+                                            let rt = tokio::runtime::Runtime::new().unwrap();
+                                            rt.block_on(translate_word_at_cursor(&app_clone));
+                                        });
+                                    }
+                                    _ => {}
+                                }
                             }
-                            _ => {}
-                        }
-                    }
-                    if shortcut == &ctrl_shift_c {
-                        match event.state() {
-                            ShortcutState::Released => {
-                                let app_clone = app.clone();
-                                std::thread::spawn(move || {
-                                    let rt = tokio::runtime::Runtime::new().unwrap();
-                                    rt.block_on(translate_selected_text(&app_clone));
-                                });
+                            if shortcut == &state.translate_clipboard {
+                                match event.state() {
+                                    GlobalShortcutState::Released => {
+                                        let app_clone = app.clone();
+                                        std::thread::spawn(move || {
+                                            let rt = tokio::runtime::Runtime::new().unwrap();
+                                            rt.block_on(translate_selected_text(&app_clone));
+                                        });
+                                    }
+                                    _ => {}
+                                }
                             }
-                            _ => {}
-                        }
-                    }
-                    if shortcut == &ctrl_i {
-                        match event.state() {
-                            ShortcutState::Released => {
-                                app.emit_to("overlay", "close_translate", ()).ok();
-                                stop_floating_translate();
+                            if shortcut == &state.close_translate {
+                                match event.state() {
+                                    GlobalShortcutState::Released => {
+                                        app.emit_to("overlay", "close_translate", ()).ok();
+                                        stop_floating_translate();
+                                    }
+                                    _ => {}
+                                }
                             }
-                            _ => {}
                         }
                     }
                 })
@@ -146,8 +165,18 @@ pub fn run() {
         .setup(move |app| {
             // let window = app.get_webview_window("main").unwrap();
             init_resource_dir(&app.handle());
-            register_shortcut_handler(&app.handle());
+            
+            // Сначала инициализируем базу данных
             setup::setup_database(&app.handle());
+            
+            // Загружаем настройки из БД и инициализируем шорткаты
+            let settings = crate::storage::Database::get_all_settings();
+            let shortcut_state = ActiveShortcuts::from_settings(&settings);
+            let shortcut_state_arc = Arc::new(Mutex::new(shortcut_state));
+            app.manage(shortcut_state_arc);
+            
+            // Регистрируем шорткаты из настроек
+            register_shortcuts_from_settings(&app.handle(), &settings);
 
             setup::setup_overlay_window(&app.handle());
             setup::setup_main_window(&app.handle());

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Progress } from '@/components/ui/Progres';
 import { getLearningStats, getWordsForStudy, updateWordProgress } from '@/shared/api/stude';
+import { useLocale } from '@/shared/lib/locale.tsx';
 import { useHeader } from '@/shared/hooks/useHeader';
 import { setLayoutStore } from '@/shared/stores/layout';
 
@@ -17,8 +18,9 @@ export const StudyPage = () => {
   const [stats, setStats] = createSignal<LearningStats | null>(null);
   const [sessionStats, setSessionStats] = createSignal({ correct: 0, wrong: 0 });
   const [loading, setLoading] = createSignal(true);
+	const { t } = useLocale();
 
-	useHeader('Изучение', '0 слов ·	0 выучено');
+	useHeader(t().study.title, '');
 
   const loadData = async () => {
     setLoading(true);
@@ -29,7 +31,7 @@ export const StudyPage = () => {
       ]);
       setWords(wordsResult);
       setStats(statsResult);
-			setLayoutStore("headerDescription", `${stats()?.total_words || 0} слов · ${stats()?.words_learned || 0} выучено`);
+			setLayoutStore("headerDescription", t().study.wordsDescription(stats()?.total_words || 0, stats()?.words_learned || 0));
     } catch (e) {
       console.error('Failed to load study data:', e);
     }
@@ -43,7 +45,6 @@ export const StudyPage = () => {
 
   const handleAnswer = async (correct: boolean) => {
     const word = currentWord();
-    if (!word) return;
 
     try {
 			await updateWordProgress(word.id, correct ? 5 : 1);
@@ -85,11 +86,11 @@ export const StudyPage = () => {
 									<div class='flex justify-center mb-4 text-neutral-500'>
 										<Zap size={48} />
 									</div>
-									<h2 class='text-lg font-semibold  mb-2'>Отлично!</h2>
-									<p class='text-neutral-400 mb-6'>Нет слов для повторения</p>
+									<h2 class='text-lg font-semibold  mb-2'>{t().study.noWordsTitle}</h2>
+									<p class='text-neutral-400 mb-6'>{t().study.noWordsDescription}</p>
 									<Button class='gap-1.5' onClick={restartSession}>
 										<RefreshCcw size={16} />
-										Обновить
+										{t().study.refresh}
 									</Button>
 								</CardContent>
 							</Card>
@@ -104,25 +105,25 @@ export const StudyPage = () => {
 											<Zap size={48} />
 										</div>
 										<h2 class='text-lg font-semibold  mb-2'>
-											Сессия завершена
+											{t().study.sessionComplete}
 										</h2>
 										<div class='flex gap-4 justify-center mb-4'>
 											<div class='text-center'>
 												<div class='text-2xl font-bold text-green-400'>
 													{sessionStats().correct}
 												</div>
-												<div class='text-xs text-neutral-500'>Правильно</div>
+												<div class='text-xs text-neutral-500'>{t().study.correct}</div>
 											</div>
 											<div class='text-center'>
 												<div class='text-2xl font-bold text-red-400'>
 													{sessionStats().wrong}
 												</div>
-												<div class='text-xs text-neutral-500'>Ошибок</div>
+												<div class='text-xs text-neutral-500'>{t().study.wrong}</div>
 											</div>
 										</div>
 										<Button class='w-full gap-1.5' onClick={restartSession}>
 											<RefreshCcw size={16} />
-											Начать заново
+											{t().study.restart}
 										</Button>
 									</CardContent>
 								</Card>
@@ -136,7 +137,7 @@ export const StudyPage = () => {
 								>
 									<CardContent class='p-8 text-center'>
 										<div class='text-xs text-neutral-500 uppercase tracking-wide mb-4'>
-											{showAnswer() ? 'Перевод' : 'Как переводится?'}
+											{showAnswer() ? t().study.translation : t().study.howToTranslate}
 										</div>
 										<div
 											class={`text-2xl font-semibold ${showAnswer() ? 'text-neutral-400' : ''}`}
@@ -152,7 +153,7 @@ export const StudyPage = () => {
 										</Show>
 										<Show when={!showAnswer()}>
 											<div class='text-xs text-neutral-600 mt-6'>
-												Нажмите для ответа
+												{t().study.clickToAnswer}
 											</div>
 										</Show>
 									</CardContent>
@@ -166,7 +167,7 @@ export const StudyPage = () => {
 											onClick={() => handleAnswer(false)}
 										>
 											<X size={16} />
-											Не знал
+											{t().study.dontKnow}
 										</Button>
 										<Button
 											class='flex-1 gap-1.5'
@@ -174,7 +175,7 @@ export const StudyPage = () => {
 											onClick={() => handleAnswer(true)}
 										>
 											<Check size={16} />
-											Знал
+											{t().study.know}
 										</Button>
 									</div>
 								</Show>

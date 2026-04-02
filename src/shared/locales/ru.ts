@@ -1,0 +1,187 @@
+import type { Locale } from './types';
+
+export const ru: Locale = {
+	common: {
+		appName: 'Wnow',
+		loading: 'Загрузка...',
+		save: 'Сохранить',
+		cancel: 'Отмена',
+		delete: 'Удалить',
+		edit: 'Редактировать',
+		close: 'Закрыть',
+		confirm: 'Подтвердить',
+		search: 'Поиск',
+		placeholder: 'Введите текст...',
+	},
+	header: {
+		dictionary: 'Словарь',
+		dictionaryDescription: 'Ваши сохранённые слова',
+		study: 'Изучение',
+		studyDescription: 'Тренировка слов',
+		settings: 'Настройки',
+		settingsDescription: 'Персонализация приложения',
+	},
+	dictionary: {
+		title: 'Словарь',
+		emptyTitle: 'Словарь пуст',
+		emptyDescription: 'Добавляйте слова через переводчик',
+		searchPlaceholder: 'Поиск...',
+		wordCount: (count: number) => {
+			const forms = [
+				count === 0 ? 'слов' : 'слово',
+				count >= 2 && count <= 4 ? 'слова' : 'слов',
+			];
+			if (count === 0) return 'слов';
+			if (count >= 2 && count <= 4) return 'слова';
+			if (count >= 5 && count <= 20) return 'слов';
+			if (count > 20) {
+				const lastDigit = count % 10;
+				const lastTwoDigits = count % 100;
+				if (lastTwoDigits >= 11 && lastTwoDigits <= 20) return 'слов';
+				if (lastDigit >= 2 && lastDigit <= 4) return 'слова';
+				return 'слов';
+			}
+			return 'слово';
+		},
+		masteryLearned: 'Выучено',
+		masteryGood: 'Хорошо',
+		masteryLearning: 'Изучается',
+		masteryNew: 'Новое',
+		wordCountHeader: (count: number) => `${count} ${ru.dictionary.wordCount(count)}`,
+		deleteConfirmTitle: 'Вы уверены?',
+		deleteConfirmButton: 'Удалить',
+		reviews: 'Повторений',
+		accuracy: 'Точность',
+		level: 'Уровень',
+	},
+	study: {
+		title: 'Изучение',
+		noWordsTitle: 'Отлично!',
+		noWordsDescription: 'Нет слов для повторения',
+		refresh: 'Обновить',
+		sessionComplete: 'Сессия завершена',
+		correct: 'Правильно',
+		wrong: 'Ошибок',
+		restart: 'Начать заново',
+		howToTranslate: 'Как переводится?',
+		translation: 'Перевод',
+		clickToAnswer: 'Нажмите для ответа',
+		dontKnow: 'Не знал',
+		know: 'Знал',
+		noWordsToRepeat: 'Нет слов для повторения',
+		wordsDescription: (total: number, learned: number) => `${total} слов · ${learned} выучено`,
+	},
+	settings: {
+		title: 'Настройки',
+		description: 'Персонализация приложения',
+		launch: {
+			title: 'Запуск',
+			description: 'Настройки запуска приложения',
+			startMinimized: 'Запускать свёрнутым',
+			startMinimizedDesc: 'Приложение будет запускаться в фоновом режиме',
+			autoLaunch: 'Автозапуск',
+			autoLaunchDesc: 'Автоматически запускать приложение при старте системы',
+		},
+		appearance: {
+			title: 'Внешний вид',
+			description: 'Настройки темы оформления',
+			theme: 'Тема',
+			themeDark: '🌙 Тёмная',
+			themeLight: '☀️ Светлая',
+			themeSystem: '💻 Системная',
+			fontSize: 'Размер шрифта',
+			fontSizeSmall: 'Маленький',
+			fontSizeMedium: 'Средний',
+			fontSizeLarge: 'Большой',
+			compactMode: 'Компактный режим',
+			compactModeDesc: 'Уменьшить отступы и размеры элементов',
+		},
+		languages: {
+			title: 'Языки',
+			description: 'Языки перевода по умолчанию',
+			sourceLanguage: 'Исходный язык',
+			targetLanguage: 'Целевой язык',
+		},
+		models: {
+			title: 'Модели',
+			description: 'Настройки моделей',
+		},
+		translationEngine: {
+			title: 'Движок перевода',
+			description: 'Настройки движка перевода',
+			replaceText: 'Заменять текст',
+			replaceTextDesc: 'Заменять изначальный текст на переведённый',
+			mode: 'Режим перевода',
+			modeOnlineFirst: '🔒 Онлайн (с офлайн fallback)',
+			modeOfflineOnly: '🔐 Только офлайн',
+			modeOnlineOnly: '🌐 Только онлайн',
+			recommendation: 'Рекомендация',
+			recommendationText: 'Режим "Локальный" обеспечивает быстрый перевод частых слов офлайн, а для сложных фраз использует онлайн-перевод.',
+			localMode: '🔒 Локальный:',
+			localModeDesc: 'Встроенный словарь + онлайн если слово не найдено',
+			offlineMode: '🔐 Только офлайн:',
+			offlineModeDesc: 'Только встроенный словарь (приватность)',
+			onlineMode: '🌐 Только онлайн:',
+			onlineModeDesc: 'Google Translate (точнее, но нужен интернет)',
+		},
+		hotkeys: {
+			title: 'Горячие клавиши',
+			description: 'Кликните на комбинацию для изменения',
+			translateWord: 'Перевод слова под курсором',
+			translateArea: 'Выделить область',
+			translateScreen: 'Перевод всего экрана',
+			translateClipboard: 'Перевод выделенного текста',
+			restartRequired: '* Изменения горячих клавиш вступят в силу после перезапуска приложения',
+		},
+		behavior: {
+			title: 'Поведение',
+			description: 'Настройки поведения приложения',
+			autoSaveWords: 'Автосохранение слов',
+			autoSaveWordsDesc: 'Автоматически сохранять переведённые слова в словарь',
+			notifications: 'Уведомления',
+			notificationsDesc: 'Показывать уведомления о событиях',
+			minimizeToTray: 'Сворачивать в трей',
+			minimizeToTrayDesc: 'Скрывать приложение в системный трей при сворачивании',
+			showContext: 'Показывать контекст',
+			showContextDesc: 'Отображать контекст предложения для слов',
+		},
+		overlay: {
+			title: 'Overlay (перевод)',
+			description: 'Настройки отображения перевода',
+			backgroundOpacity: 'Прозрачность фона',
+			position: 'Позиция overlay',
+			positionTop: '⬆️ Сверху',
+			positionBottom: '⬇️ Снизу',
+			positionCenter: '↕️ По центру',
+			duration: 'Время показа (мс)',
+			autoCopy: 'Автокопирование',
+			autoCopyDesc: 'Копировать перевод в буфер обмена',
+			hideAfterShow: 'Скрывать после показа',
+			hideAfterShowDesc: 'Автоматически скрывать overlay после показа',
+			soundEffects: 'Звуковые эффекты',
+			soundEffectsDesc: 'Воспроизводить звук при показе перевода',
+		},
+		reset: {
+			button: 'Сбросить настройки по умолчанию',
+			confirmTitle: 'Вы уверены?',
+			confirmDesc: 'Все настройки будут возвращены к значениям по умолчанию',
+			success: 'Настройки сброшены',
+			successDesc: 'Все настройки возвращены к значениям по умолчанию',
+			error: 'Ошибка',
+			errorDesc: 'Не удалось сбросить настройки',
+		},
+	},
+	toast: {
+		saved: 'Сохранено',
+		deleted: 'Удалено',
+		error: 'Ошибка',
+		success: 'Успешно',
+	},
+	dialog: {
+		cancel: 'Отмена',
+		confirm: 'Подтвердить',
+		close: 'Закрыть',
+	},
+};
+
+export default ru;
