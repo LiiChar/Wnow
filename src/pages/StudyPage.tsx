@@ -5,21 +5,21 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Progress } from '@/components/ui/Progres';
 import { getLearningStats, getWordsForStudy, updateWordProgress } from '@/shared/api/stude';
-import { useLocale } from '@/shared/lib/locale.tsx';
 import { useHeader } from '@/shared/hooks/useHeader';
-import { setLayoutStore } from '@/shared/stores/layout';
+import { useLocale } from '@/shared/lib/locale.tsx';
 import { cn } from '@/shared/lib/utils';
+import { setLayoutStore } from '@/shared/stores/layout';
 
 import type { FlashcardWord, LearningStats } from '../shared/types/storage';
 
 type QualityLevel = 1 | 3 | 5;
 
 interface SessionStats {
-  correct: number;
-  wrong: number;
-  streak: number;
   bestStreak: number;
+  correct: number;
+  streak: number;
   timeSpent: number;
+  wrong: number;
 }
 
 export const StudyPage = () => {
@@ -149,16 +149,15 @@ export const StudyPage = () => {
   return (
 		<div class='h-full flex flex-col'>
 			{/* Progress bar */}
-			<Progress value={progress()} class='h-1' />
+			<Progress class='h-1' value={progress()} />
 
       {/* Header с прогрессом */}
-      <div class='flex items-center justify-between px-4 py-2 border-b border-border'>
+      <div class='flex items-center justify-between py-2 border-b border-border'>
         <div class='text-sm text-muted-foreground'>
           {currentIndex() + 1} / {words().length}
         </div>
         <div class='flex items-center gap-4 text-xs text-muted-foreground'>
           <div class='flex items-center gap-1'>
-            <Sparkles class='h-3.5 w-3.5 text-amber-400' />
             <span>Серия: <span class='font-semibold text-foreground'>{sessionStats().streak}</span></span>
           </div>
           <div class='flex items-center gap-1'>
@@ -167,7 +166,7 @@ export const StudyPage = () => {
         </div>
       </div>
 
-			<div class='flex-1 flex items-center justify-center p-4'>
+			<div class='flex-1 flex justify-center p-4 px-2'>
 				<Show
 					fallback={
 						<div class='w-8 h-8 border-2 border-neutral-400 border-t-transparent rounded-full animate-spin' />
@@ -254,14 +253,14 @@ export const StudyPage = () => {
                 {/* Карточка слова */}
 								<Card
 									class={cn(
-                    'cursor-pointer min-h-80 transition-all duration-300',
+                    'cursor-pointer  transition-all duration-300',
                     selectedQuality() === 5 && 'ring-2 ring-green-500',
                     selectedQuality() === 3 && 'ring-2 ring-blue-500',
                     selectedQuality() === 1 && 'ring-2 ring-red-500',
                   )}
 									onClick={() => !showAnswer() && setShowAnswer(true)}
 								>
-									<CardContent class='p-8 text-center'>
+									<CardContent class='p-4 text-center'>
 										<Show
 											fallback={
                         <>
@@ -320,7 +319,6 @@ export const StudyPage = () => {
 											<X size={16} />
 											<div class='flex flex-col items-center leading-none'>
 												<span>Трудно</span>
-												<span class='text-xs opacity-70'>1</span>
 											</div>
 										</Button>
 										<Button
@@ -334,7 +332,6 @@ export const StudyPage = () => {
 											<Check size={16} />
 											<div class='flex flex-col items-center leading-none'>
 												<span>Нормально</span>
-												<span class='text-xs opacity-70'>3</span>
 											</div>
 										</Button>
 										<Button
@@ -348,32 +345,18 @@ export const StudyPage = () => {
 											<Sparkles size={16} />
 											<div class='flex flex-col items-center leading-none'>
 												<span>Легко</span>
-												<span class='text-xs opacity-70'>5</span>
 											</div>
 										</Button>
 									</div>
-                  
-                  {/* Подсказка по клавишам */}
-                  <div class='flex items-center justify-center gap-4 mt-3 text-xs text-muted-foreground'>
-                    <span class='flex items-center gap-1'>
-                      <kbd class='px-1.5 py-0.5 bg-secondary rounded text-xs'>1</kbd> Трудно
-                    </span>
-                    <span class='flex items-center gap-1'>
-                      <kbd class='px-1.5 py-0.5 bg-secondary rounded text-xs'>3</kbd> Нормально
-                    </span>
-                    <span class='flex items-center gap-1'>
-                      <kbd class='px-1.5 py-0.5 bg-secondary rounded text-xs'>5</kbd> Легко
-                    </span>
-                  </div>
 								</Show>
 
                 {/* Кнопка пропуска */}
                 <Show when={!showAnswer() && words().length > 1}>
-                  <div class='flex justify-center mt-4'>
+                  <div class='flex justify-center mt-2'>
                     <Button
-                      variant='ghost'
-                      size='sm'
                       class='gap-1.5 text-muted-foreground'
+                      size='sm'
+                      variant='ghost'
                       onClick={skipCard}
                     >
                       <ChevronRight size={16} />
