@@ -32,7 +32,10 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "resources/**/*"
+      "resources/dictionary/**/*",
+      "resources/fonts/**/*",
+      "resources/ocr-model/**/*",
+      "resources/screenshot/**/*"
     ]
   }
 }

@@ -179,15 +179,17 @@ pub fn run() {
             // Регистрируем шорткаты из настроек
             register_shortcuts_from_settings(&app.handle(), &settings);
 
+            // Сначала создаём окна
+            create_main_window(&app.handle())?;
+            create_overlay_window(&app.handle())?;
+            create_notification_window(&app.handle())?;
+
+            // Затем настраиваем их обработчики (окна уже существуют)
             setup::setup_overlay_window(&app.handle());
             setup::setup_main_window(&app.handle());
             setup::setup_notification_window(&app.handle());
 
             setup::setup_tray(&app.handle())?;
-
-            create_main_window(&app.handle())?;
-            create_overlay_window(&app.handle())?;
-            create_notification_window(&app.handle())?;
 
             use tauri_plugin_notification::NotificationExt;
             app.notification()

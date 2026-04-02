@@ -19,7 +19,8 @@ export default defineConfig(async () => ({
 			rollupOptions: {
 					input: {
 							overlay: "overlay.html",
-							index: "index.html"
+							index: "index.html",
+							notification: "notification.html"
 					}
 			}
 	},
