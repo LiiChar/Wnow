@@ -166,7 +166,7 @@ export const StudyPage = () => {
         </div>
       </div>
 
-			<div class='flex-1 flex justify-center p-4 px-2'>
+			<div class=' flex justify-center p-4 px-2 '>
 				<Show
 					fallback={
 						<div class='w-8 h-8 border-2 border-neutral-400 border-t-transparent rounded-full animate-spin' />
@@ -206,34 +206,34 @@ export const StudyPage = () => {
 										</CardDescription>
 									</CardHeader>
 									<CardContent>
-                    <div class='grid grid-cols-3 gap-3 mb-4'>
-                      <div class='bg-green-500/10 rounded-lg p-3 text-center'>
+                    <div class='grid grid-cols-3 gap-1 mb-1'>
+                      <div class='bg-green-500/10 rounded-lg p-1 text-center'>
                         <div class='text-2xl font-bold text-green-500'>
                           {sessionStats().correct}
                         </div>
                         <div class='text-xs text-muted-foreground'>Верно</div>
                       </div>
-                      <div class='bg-red-500/10 rounded-lg p-3 text-center'>
+                      <div class='bg-red-500/10 rounded-lg p-1 text-center'>
                         <div class='text-2xl font-bold text-red-500'>
                           {sessionStats().wrong}
                         </div>
                         <div class='text-xs text-muted-foreground'>Ошибок</div>
                       </div>
-                      <div class='bg-amber-500/10 rounded-lg p-3 text-center'>
+                      <div class='bg-amber-500/10 rounded-lg p-1 text-center'>
                         <div class='text-2xl font-bold text-amber-500'>
                           {accuracy()}%
                         </div>
                         <div class='text-xs text-muted-foreground'>Точность</div>
                       </div>
                     </div>
-                    <div class='flex gap-2 mb-4'>
-                      <div class='flex-1 bg-secondary rounded-lg p-3 text-center'>
+                    <div class='flex gap-1 mb-2'>
+                      <div class='flex-1 bg-secondary rounded-lg p-1 text-center'>
                         <div class='text-lg font-semibold text-amber-400'>
                           {sessionStats().bestStreak}
                         </div>
                         <div class='text-xs text-muted-foreground'>Лучшая серия</div>
                       </div>
-                      <div class='flex-1 bg-secondary rounded-lg p-3 text-center'>
+                      <div class='flex-1 bg-secondary rounded-lg p-1 text-center'>
                         <div class='text-lg font-semibold text-blue-400'>
                           {formatTime(sessionStats().timeSpent)}
                         </div>
