@@ -3,7 +3,7 @@ use crate::commands::database::get_settings;
 use crate::img::{TextReplacementParams, ocr_word_to_translated_box, replace_text_in_image};
 use crate::storage::Database;
 use crate::translation::local::get_translate_lang;
-use crate::{get_resource_dir, source};
+use crate::get_resource_dir;
 use crate::ocr::{postprocess_ocr, preprocess_for_tesseract_sys, recognize_with_boxes, OcrWord};
 use crate::translation::translate as t;
 use crate::utils::fnv1a_hash;
@@ -15,6 +15,32 @@ use std::sync::Arc;
 use std::time::Instant;
 use tauri::{Emitter, WebviewWindow};
 use tauri_plugin_log::log::{log, Level};
+
+/// Переиспользуемый буфер для PNG-кодирования (избегаем аллокаций на каждый фрагмент)
+struct PngEncodeBuffer {
+    buffer: Vec<u8>,
+}
+
+impl PngEncodeBuffer {
+    fn with_capacity(cap: usize) -> Self {
+        Self {
+            buffer: Vec::with_capacity(cap),
+        }
+    }
+
+    fn clear(&mut self) {
+        self.buffer.clear();
+    }
+
+    /// Закодировать изображение в PNG → base64, переиспользуя внутренний буфер.
+    fn encode_to_base64(&mut self, image: &RgbaImage) -> Result<String, String> {
+        self.clear();
+        image
+            .write_to(&mut std::io::Cursor::new(&mut self.buffer), image::ImageFormat::Png)
+            .map_err(|e| format!("PNG encode error: {}", e))?;
+        Ok(base64::engine::general_purpose::STANDARD.encode(&self.buffer))
+    }
+}
 
 static FLOATING_TRANSLATE_RUNNING: once_cell::sync::Lazy<Arc<AtomicBool>> =
     once_cell::sync::Lazy::new(|| Arc::new(AtomicBool::new(false)));
@@ -91,81 +117,144 @@ pub fn get_block_image_translate(
     pos: (i32, i32),
     size: (i32, i32),
 ) -> Result<(String, Vec<OcrWord>), String> {
-    let (translated_text, translated_boxes_result) = get_block_translate(webview_window, pos, size).expect("Could not get block transtalte");
+    let scale = webview_window.scale_factor().unwrap_or(1.0) as f32;
 
-    let mut translated_boxes = Vec::new();
+    let phys_x = (pos.0 as f32 * scale) as i32;
+    let phys_y = (pos.1 as f32 * scale) as i32;
+    let phys_w = (size.0 as f32 * scale) as i32;
+    let phys_h = (size.1 as f32 * scale) as i32;
 
-    for boxes in translated_boxes_result.into_iter() {
-        translated_boxes.push(ocr_word_to_translated_box(
-            boxes.x,
-            boxes.y,
-            boxes.w,
-            boxes.h,
-            &boxes.text,
-            &boxes.translation.as_ref().unwrap_or(&String::new()),
-        ));
-    }
-    
+    let (source_lang, target_lang) = get_translate_lang();
+
     let mut capture = Capture::new();
-    let (phys_w, phys_h) = capture.get_capture_size();
+
+    // 1. OCR
+    let (text, clear_boxes) = box_ocr(&mut capture, phys_x, phys_y, phys_w, phys_h, scale)?;
+
+    if text.trim().is_empty() && clear_boxes.is_empty() {
+        return Ok(("".to_string(), vec![]));
+    }
+
+    let uniq_id = fnv1a_hash(text.as_bytes());
+
+    // 2. Перевод
+    let mut requests = vec![text.clone()];
+    requests.extend(clear_boxes.iter().map(|b| b.text.clone()));
+
+    let results = tauri::async_runtime::block_on(join_all(
+        requests.into_iter().map(|text| t(text, &source_lang, &target_lang)),
+    ));
+
+    let mut translated_text = text.clone();
+    let mut translated_boxes: Vec<crate::img::TranslatedBox> = Vec::with_capacity(clear_boxes.len());
+
+    for (i, result) in results.into_iter().enumerate() {
+        if let Ok(translated) = result {
+            if i == 0 {
+                log!(
+                    Level::Info,
+                    "[translate] translated text: {}, source: {}",
+                    translated,
+                    text
+                );
+                translated_text = translated;
+            } else {
+                let b = &clear_boxes[i - 1];
+                translated_boxes.push(ocr_word_to_translated_box(
+                    b.x,
+                    b.y,
+                    b.w,
+                    b.h,
+                    &b.text,
+                    &translated,
+                ));
+            }
+        }
+    }
+
+    if translated_boxes.is_empty() {
+        return Ok((translated_text, vec![]));
+    }
+
+    // 3. Захват изображения (один раз)
     let buffer = capture.capture_fragment(pos.0, pos.1, size.0, size.1);
-
     let rgba_image = RgbaImage::from_raw(size.0 as u32, size.1 as u32, buffer)
-    .expect("Could not convert rgba from raw");
+        .ok_or("Failed to create RgbaImage from captured buffer")?;
+
+    // 4. Batch-обработка: все боксы за один проход
     let replacement_params = TextReplacementParams::default();
-    let mut fragments = Vec::new();
+    let result = replace_text_in_image(&rgba_image, &translated_boxes, &replacement_params)
+        .map_err(|e| format!("Text replacement error: {}", e))?;
 
-    for tb in &translated_boxes {
-        let sub_image = image::imageops::crop_imm(
-            &rgba_image,
-            tb.x as u32,
-            tb.y as u32,
-            tb.width as u32,
-            tb.height as u32,
-        )
-        .to_image();
+    // 5. Извлекаем фрагменты из обработанного изображения
+    let processed = &result.image;
+    let mut png_buffer = PngEncodeBuffer::with_capacity(rgba_image.width() as usize * rgba_image.height() as usize * 4);
+    let mut fragments = Vec::with_capacity(translated_boxes.len());
 
-        let local_box = ocr_word_to_translated_box(
-            0,
-            0,
-            tb.width,
-            tb.height,
-            &tb.original_text,
-            &tb.translated_text,
-        );
+    for (idx, tb) in translated_boxes.iter().enumerate() {
+        // Координаты относительно захваченного изображения (уже корректные)
+        let x = tb.x.max(0) as u32;
+        let y = tb.y.max(0) as u32;
+        let w = tb.width.max(0) as u32;
+        let h = tb.height.max(0) as u32;
 
-        if let Ok(result) =
-            replace_text_in_image(&sub_image, &[local_box], &replacement_params)
-        {
-            let mut img_buffer = Vec::new();
+        if w == 0 || h == 0 {
+            continue;
+        }
 
-            if result
-                .image
-                .write_to(
-                    &mut std::io::Cursor::new(&mut img_buffer),
-                    image::ImageFormat::Png,
-                )
-                .is_ok()
-            {
-                let base64_image =
-                    base64::engine::general_purpose::STANDARD.encode(&img_buffer);
+        // Вырезаем фрагмент из ЕДИНОГО обработанного изображения
+        let fragment = crop_fragment(processed, x, y, w, h);
 
+        // ⚠️ Каждый бокс получает УНИКАЛЬНЫЙ id (uniq_id + индекс)
+        let box_id = format!("{}_{}", uniq_id, idx);
+
+        match png_buffer.encode_to_base64(&fragment) {
+            Ok(base64_image) => {
                 fragments.push(OcrWord {
-                    image: Some(base64_image),
+                    id: Some(box_id),
                     x: tb.x,
                     y: tb.y,
                     w: tb.width,
                     h: tb.height,
                     text: tb.original_text.clone(),
                     translation: Some(tb.translated_text.clone()),
-                    id: None,
+                    image: Some(base64_image),
                 });
+            }
+            Err(e) => {
+                log!(Level::Error, "[get_block_image_translate] PNG encode error: {}", e);
             }
         }
     }
 
+    // Логируем статистику
+    log!(
+        Level::Info,
+        "[text_replacement] Processed {} boxes, {} successful, avg font size: {:.1}, time: {}ms",
+        result.stats.boxes_processed,
+        result.stats.boxes_successful,
+        result.stats.avg_font_size,
+        result.stats.processing_time_ms
+    );
 
     Ok((translated_text, fragments))
+}
+
+/// Вырезать фрагмент из изображения с проверкой границ.
+fn crop_fragment(image: &RgbaImage, x: u32, y: u32, w: u32, h: u32) -> RgbaImage {
+    let (img_w, img_h) = image.dimensions();
+
+    // Clamp координат и размеров
+    let x = x.min(img_w);
+    let y = y.min(img_h);
+    let w = w.min(img_w - x);
+    let h = h.min(img_h - y);
+
+    if w == 0 || h == 0 {
+        return RgbaImage::new(1, 1);
+    }
+
+    image::imageops::crop_imm(image, x, y, w, h).to_image()
 }
 
 
@@ -197,6 +286,8 @@ pub async fn start_floating_image_translate(
         let phys_h = (size.1 as f32 * scale) as i32;
 
         let mut capture = Capture::new();
+        let mut png_buffer = PngEncodeBuffer::with_capacity(1024 * 1024); // 1MB начальный буфер
+        let replacement_params = TextReplacementParams::default();
 
         while running.load(Ordering::Relaxed) {
             let start = std::time::Instant::now();
@@ -211,6 +302,7 @@ pub async fn start_floating_image_translate(
 
                 let uniq_id = fnv1a_hash(text.as_bytes());
 
+                // Перевод
                 let mut requests = vec![text.clone()];
                 requests.extend(clear_boxes.iter().map(|b| b.text.clone()));
 
@@ -219,7 +311,7 @@ pub async fn start_floating_image_translate(
                 ));
 
                 let mut translated_text = text.clone();
-                let mut translated_boxes_result = Vec::new();
+                let mut translated_boxes: Vec<crate::img::TranslatedBox> = Vec::with_capacity(clear_boxes.len());
 
                 for (i, result) in results.into_iter().enumerate() {
                     if let Ok(translated) = result {
@@ -227,86 +319,67 @@ pub async fn start_floating_image_translate(
                             translated_text = translated;
                         } else {
                             let b = &clear_boxes[i - 1];
-                            translated_boxes_result.push(OcrWord {
-                                id: Some(uniq_id.to_string()),
-                                x: b.x,
-                                y: b.y,
-                                w: b.w,
-                                h: b.h,
-                                text: b.text.clone(),
-                                translation: Some(translated),
-                                image: None
-                            });
+                            translated_boxes.push(ocr_word_to_translated_box(
+                                b.x,
+                                b.y,
+                                b.w,
+                                b.h,
+                                &b.text,
+                                &translated,
+                            ));
                         }
                     }
                 }
 
-                let mut translated_boxes = Vec::new();
-
-                for boxes in translated_boxes_result.into_iter() {  
-                    translated_boxes.push(ocr_word_to_translated_box(
-                        boxes.x,
-                        boxes.y,
-                        boxes.w,
-                        boxes.h,
-                        &boxes.text,
-                        &boxes.translation.as_ref().unwrap_or(&String::new()),
-                    ));
-                }
-                
+                // Захват изображения
                 let buffer = capture.capture_fragment(pos.0, pos.1, size.0, size.1);
+                let rgba_image = match RgbaImage::from_raw(size.0 as u32, size.1 as u32, buffer) {
+                    Some(img) => img,
+                    None => {
+                        log!(Level::Error, "[floating] Failed to create RgbaImage");
+                        continue;
+                    }
+                };
 
-                let rgba_image = RgbaImage::from_raw(size.0 as u32, size.1 as u32, buffer)
-                    .expect("Could not convert rgba from raw");
-                let replacement_params = TextReplacementParams::default();
-                let mut fragments = Vec::new();
+                // Batch-обработка: все боксы за один проход
+                let result = match replace_text_in_image(&rgba_image, &translated_boxes, &replacement_params) {
+                    Ok(r) => r,
+                    Err(e) => {
+                        log!(Level::Error, "[floating] Text replacement error: {}", e);
+                        continue;
+                    }
+                };
 
-                for tb in &translated_boxes {
-                    let sub_image = image::imageops::crop_imm(
-                        &rgba_image,
-                        tb.x as u32,
-                        tb.y as u32,
-                        tb.width as u32,
-                        tb.height as u32,
-                    )
-                    .to_image();
+                // Извлекаем фрагменты
+                let processed = &result.image;
+                let mut fragments = Vec::with_capacity(translated_boxes.len());
 
-                    let local_box = ocr_word_to_translated_box(
-                        0,
-                        0,
-                        tb.width,
-                        tb.height,
-                        &tb.original_text,
-                        &tb.translated_text,
-                    );
+                for (idx, tb) in translated_boxes.iter().enumerate() {
+                    let x = tb.x.max(0) as u32;
+                    let y = tb.y.max(0) as u32;
+                    let w = tb.width.max(0) as u32;
+                    let h = tb.height.max(0) as u32;
 
-                    if let Ok(result) =
-                        replace_text_in_image(&sub_image, &[local_box], &replacement_params)
-                    {
-                        let mut img_buffer = Vec::new();
+                    if w == 0 || h == 0 {
+                        continue;
+                    }
 
-                        if result
-                            .image
-                            .write_to(
-                                &mut std::io::Cursor::new(&mut img_buffer),
-                                image::ImageFormat::Png,
-                            )
-                            .is_ok()
-                        {
-                            let base64_image =
-                                base64::engine::general_purpose::STANDARD.encode(&img_buffer);
+                    let fragment = crop_fragment(processed, x, y, w, h);
 
-                            fragments.push(OcrWord {
-                                image: Some(base64_image),
-                                x: tb.x,
-                                y: tb.y,
-                                w: tb.width,
-                                h: tb.height,
-                                text: tb.original_text.clone(),
-                                translation: Some(tb.translated_text.clone()),
-                                id: None,
-                            });
-                        }
+                    // ⚠️ Уникальный ID для каждого бокса
+                    let box_id = format!("{}_{}", uniq_id, idx);
+
+                    if let Ok(base64_image) = png_buffer.encode_to_base64(&fragment) {
+                        fragments.push(OcrWord {
+                            id: Some(box_id),
+                            x: tb.x,
+                            y: tb.y,
+                            w: tb.width,
+                            h: tb.height,
+                            text: tb.original_text.clone(),
+                            translation: Some(tb.translated_text.clone()),
+                            image: Some(base64_image),
+                        });
                     }
                 }
 
@@ -317,10 +390,9 @@ pub async fn start_floating_image_translate(
                 );
             }
 
-            // ⏱ задержка
-            std::thread::sleep(std::time::Duration::from_micros(delay as u64));
+            std::thread::sleep(std::time::Duration::from_millis(delay as u64));
 
-            println!("tick {}ms", start.elapsed().as_millis());
+            log!(Level::Debug, "[floating] tick {}ms", start.elapsed().as_millis());
         }
     });
 

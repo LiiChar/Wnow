@@ -1,24 +1,37 @@
-//! Модуль замены текста на изображениях
+//! Модуль замены текста на изображениях.
 //!
 //! Pipeline:
-//! 1. Получаем изображение и OCR-боксы
+//! 1. Получаем изображение и OCR-боксы с переводом
 //! 2. Для каждого бокса:
+//!    - Анализируем стиль оригинального текста
+//!    - Выбираем подходящий шрифт
 //!    - Вырезаем область бокса
-//!    - Стираем текст (inpainting)
-//!    - Вставляем обратно
-//!    - Рисуем переведённый текст поверх
+//!    - Стираем текст (blur-based background reconstruction)
+//!    - Вставляем обработанную область обратно
+//!    - Рисуем подложку
+//!    - Рендерим переведённый текст с multi-line wrapping
+//!
+//! Архитектура:
+//! - `layout.rs` — word wrapping, text measurement, font size fitting
+//! - `style.rs` — style detection (uppercase, bold, alignment)
+//! - `background.rs` — background reconstruction (blur, edge-aware fill)
+//! - `render.rs` — multi-line text rendering с glyph positioning
+//! - `font.rs` — multi-font support (sans, serif, mono)
 
-use image::{Rgba, RgbaImage};
-use rusttype::{Font, Scale};
-use std::sync::OnceLock;
+use image::RgbaImage;
+use rusttype::Font;
 
-use crate::get_resource_dir;
+use crate::img::background::erase_text_from_image;
+use crate::img::font::{get_default_font, get_font, select_font_for_text};
+use crate::img::layout::{calculate_optimal_font_size, LayoutParams};
+use crate::img::render::{draw_background_rect, render_text, TextRenderParams};
+use crate::img::style::{
+    analyze_text_style, apply_style_to_translation, determine_text_and_bg_colors, TextAlignment,
+};
 
-/// Путь к шрифту по умолчанию
-const FONT_FILENAME: &str = "fonts/NotoSans-Regular.ttf";
-
-/// Глобальный кэш шрифта
-static FONT: OnceLock<Font<'static>> = OnceLock::new();
+// ============================================================================
+// PUBLIC TYPES
+// ============================================================================
 
 /// Параметры для замены текста
 #[derive(Debug, Clone)]
@@ -33,22 +46,37 @@ pub struct TextReplacementParams {
     pub min_font_size: f32,
     /// Максимальный размер шрифта
     pub max_font_size: f32,
-    /// Шаг подбора размера шрифта
-    pub font_size_step: f32,
+    /// Точность подбора размера шрифта
+    pub font_size_tolerance: f32,
     /// Множитель межбуквенного интервала (1.0 = стандартный кернинг)
     pub letter_spacing: f32,
+    /// Коэффициент высоты строки
+    pub line_height_ratio: f32,
+    /// Использовать edge-aware background reconstruction (медленнее, но качественнее)
+    pub use_edge_aware_bg: bool,
+    /// Радиус размытия фона
+    pub bg_blur_radius: u32,
+    /// Выравнивание текста (переопределяет автоопределение)
+    pub alignment_override: Option<TextAlignment>,
+    /// Debug mode (рисовать bounding boxes)
+    pub debug_mode: bool,
 }
 
 impl Default for TextReplacementParams {
     fn default() -> Self {
         Self {
-            mask_padding: 3,
+            mask_padding: 4,
             text_padding: 6,
-            overlay_alpha: 0.3,
+            overlay_alpha: 0.25,
             min_font_size: 8.0,
             max_font_size: 72.0,
-            font_size_step: 0.5,
-            letter_spacing: 1.15,
+            font_size_tolerance: 0.25,
+            letter_spacing: 1.1,
+            line_height_ratio: 1.2,
+            use_edge_aware_bg: false,
+            bg_blur_radius: 3,
+            alignment_override: None,
+            debug_mode: false,
         }
     }
 }
@@ -79,40 +107,26 @@ pub struct ReplacementStats {
     pub boxes_processed: usize,
     pub boxes_successful: usize,
     pub avg_font_size: f32,
+    pub avg_lines_per_box: f32,
     pub processing_time_ms: u64,
 }
 
-/// Получить шрифт из кэша или загрузить из файла
-fn get_font() -> &'static Font<'static> {
-    FONT.get_or_init(|| {
-        let font_path = get_resource_dir().join(FONT_FILENAME);
-
-        if !font_path.exists() {
-            panic!(
-                "Font file not found: {}. Please download Noto Sans Regular and place it at {}",
-                FONT_FILENAME,
-                font_path.display()
-            );
-        }
-
-        let font_data = std::fs::read(&font_path).expect("Failed to read font file");
-
-        let leaked_data: &'static [u8] = Box::leak(font_data.into_boxed_slice());
-
-        Font::try_from_bytes(leaked_data).expect("Failed to parse font")
-    })
+/// Результат обработки одного бокса (для внутреннего использования)
+struct BoxProcessResult {
+    font_size: f32,
+    lines_rendered: usize,
 }
 
 // ============================================================================
 // PUBLIC API
 // ============================================================================
 
-/// Заменить текст на изображении
+/// Заменить текст на изображении.
 ///
 /// # Аргументы
-/// * `image` - исходное изображение в RGBA формате
-/// * `boxes` - вектор боксов с оригинальным текстом и переводом
-/// * `params` - параметры замены
+/// * `image` — исходное изображение в RGBA формате
+/// * `boxes` — вектор боксов с оригинальным текстом и переводом
+/// * `params` — параметры замены
 ///
 /// # Возвращает
 /// Обработанное изображение с заменённым текстом
@@ -123,7 +137,7 @@ pub fn replace_text_in_image(
 ) -> Result<TextReplacementResult, String> {
     let start_time = std::time::Instant::now();
 
-    let font = get_font();
+    let font = get_default_font();
     let mut result_image = image.clone();
     let mut stats = ReplacementStats {
         boxes_processed: boxes.len(),
@@ -131,13 +145,15 @@ pub fn replace_text_in_image(
     };
 
     let mut total_font_size = 0.0;
+    let mut total_lines = 0;
     let mut successful_boxes = 0;
 
     // Обрабатываем каждый бокс
     for box_item in boxes {
         match process_single_box(&mut result_image, box_item, font, params) {
-            Ok(font_size) => {
-                total_font_size += font_size;
+            Ok(result) => {
+                total_font_size += result.font_size;
+                total_lines += result.lines_rendered;
                 successful_boxes += 1;
             }
             Err(e) => {
@@ -149,6 +165,7 @@ pub fn replace_text_in_image(
     stats.boxes_successful = successful_boxes;
     if successful_boxes > 0 {
         stats.avg_font_size = total_font_size / successful_boxes as f32;
+        stats.avg_lines_per_box = total_lines as f32 / successful_boxes as f32;
     }
     stats.processing_time_ms = start_time.elapsed().as_millis() as u64;
 
@@ -163,59 +180,74 @@ pub fn replace_text_in_image(
 // ============================================================================
 
 /// Обработать один бокс:
-/// 1. Вырезать область
-/// 2. Удалить текст
-/// 3. Вставить обратно
-/// 4. Нарисовать перевод
+/// 1. Анализ стиля оригинального текста
+/// 2. Выбор шрифта
+/// 3. Вырезание области
+/// 4. Удаление текста (background reconstruction)
+/// 5. Вставка обратно
+/// 6. Рисование подложки
+/// 7. Рендеринг перевода
 fn process_single_box(
     image: &mut RgbaImage,
     box_item: &TranslatedBox,
-    font: &Font,
+    _default_font: &Font,
     params: &TextReplacementParams,
-) -> Result<f32, String> {
+) -> Result<BoxProcessResult, String> {
     let (img_width, img_height) = image.dimensions();
     let padding = params.mask_padding as i32;
 
     // Вычисляем координаты с паддингом
     let x_start_i = (box_item.x - padding).max(0);
     let y_start_i = (box_item.y - padding).max(0);
-
     let x_end_i = (box_item.x + box_item.width + padding)
         .min(img_width as i32)
         .max(0);
-
     let y_end_i = (box_item.y + box_item.height + padding)
         .min(img_height as i32)
         .max(0);
 
-    // 🔥 критическая проверка
+    // Проверка валидности
     if x_end_i <= x_start_i || y_end_i <= y_start_i {
         return Err("Invalid box after bounds clamp".into());
     }
 
-    // теперь можно безопасно
     let box_x = x_start_i as u32;
     let box_y = y_start_i as u32;
     let box_w = (x_end_i - x_start_i) as u32;
     let box_h = (y_end_i - y_start_i) as u32;
 
     if box_w == 0 || box_h == 0 {
-        return Ok(0.0);
+        return Err("Zero-size box".into());
     }
 
-    // Шаг 1: Вырезаем область бокса
-    let mut cropped = crop_region(image, box_x, box_y, box_w, box_h);
+    // --- Шаг 1: Анализ стиля оригинального текста ---
+    let style = analyze_text_style(
+        &box_item.original_text,
+        box_item.width,
+        box_item.height,
+    );
 
-    // Шаг 2: Стираем текст в вырезанной области (inpainting)
-    erase_text_from_region(&mut cropped, params.mask_padding);
+    // --- Шаг 2: Применяем стиль к переводу ---
+    let styled_translation =
+        apply_style_to_translation(&box_item.original_text, &box_item.translated_text);
 
-    // Шаг 3: Вставляем обработанную область обратно
-    paste_region(image, &cropped, box_x, box_y);
+    // --- Шаг 3: Выбор шрифта ---
+    let font_type = select_font_for_text(&box_item.original_text);
+    let font = get_font(font_type);
 
-    // Шаг 4: Определяем цвет текста и рисуем подложку
-    let (text_color, bg_color) = determine_text_color(&cropped, box_w, box_h);
+    // --- Шаг 4: Вырезаем область бокса ---
+    let mut cropped = crop_region_fast(image, box_x, box_y, box_w, box_h);
 
-    // Рисуем подложку в области бокса (без паддинга)
+    // --- Шаг 5: Стираем текст (background reconstruction) ---
+    erase_text_from_image(&mut cropped, params.use_edge_aware_bg, params.bg_blur_radius);
+
+    // --- Шаг 6: Вставляем обработанную область обратно ---
+    paste_region_fast(image, &cropped, box_x, box_y);
+
+    // --- Шаг 7: Определяем цвет текста и фона ---
+    let (text_color, bg_color) = determine_text_and_bg_colors(&cropped, params.overlay_alpha);
+
+    // --- Шаг 8: Рисуем подложку в области бокса (без паддинга) ---
     draw_background_rect(
         image,
         box_item.x as u32,
@@ -225,38 +257,87 @@ fn process_single_box(
         bg_color,
     );
 
-    // Шаг 5: Вычисляем оптимальный размер шрифта
-    let font_size = calculate_optimal_font_size(
-        &box_item.translated_text,
-        font,
-        box_item.width as u32,
-        box_item.height as u32,
-        params,
-    );
+    // --- Шаг 9: Вычисляем оптимальный размер шрифта ---
+    let available_width = box_item.width as f32 - 2.0 * params.text_padding as f32;
+    let available_height = box_item.height as f32 - 2.0 * params.text_padding as f32;
 
-    // Шаг 6: Рисуем переведённый текст
-    draw_text_on_image(
-        image,
-        &box_item.translated_text,
-        box_item.x as f32 + params.text_padding as f32,
-        box_item.y as f32 + params.text_padding as f32,
-        (box_item.width as i32 - 2 * params.text_padding as i32) as u32,
-        (box_item.height as i32 - 2 * params.text_padding as i32) as u32,
-        font,
+    let layout_params = LayoutParams {
+        available_width: available_width.max(0.0),
+        available_height: available_height.max(0.0),
+        letter_spacing: params.letter_spacing,
+        line_height_ratio: params.line_height_ratio,
+        min_font_size: params.min_font_size,
+        max_font_size: params.max_font_size,
+        tolerance: params.font_size_tolerance,
+    };
+
+    let font_size = calculate_optimal_font_size(&styled_translation, font, &layout_params);
+
+    // --- Шаг 10: Рендерим переведённый текст ---
+    let alignment = params
+        .alignment_override
+        .unwrap_or(style.alignment);
+
+    let render_params = TextRenderParams {
         font_size,
         text_color,
-        params.letter_spacing,
+        letter_spacing: params.letter_spacing,
+        line_height_ratio: params.line_height_ratio,
+        alignment,
+        bold: style.bold,
+        bold_offset: style.bold_offset,
+        padding: params.text_padding as f32,
+        debug_mode: params.debug_mode,
+        ..Default::default()
+    };
+
+    let render_result = render_text(
+        image,
+        &styled_translation,
+        box_item.x as f32,
+        box_item.y as f32,
+        box_item.width as f32,
+        box_item.height as f32,
+        font,
+        &render_params,
     );
 
-    Ok(font_size)
+    Ok(BoxProcessResult {
+        font_size,
+        lines_rendered: render_result.lines_rendered,
+    })
 }
 
 // ============================================================================
-// IMAGE MANIPULATION
+// IMAGE MANIPULATION (OPTIMIZED)
 // ============================================================================
 
-/// Вырезать область из изображения
-fn crop_region(image: &RgbaImage, x: u32, y: u32, width: u32, height: u32) -> RgbaImage {
+/// Вырезать область из изображения.
+///
+/// Оптимизированная версия: использует copy_from_slice где возможно.
+fn crop_region_fast(image: &RgbaImage, x: u32, y: u32, width: u32, height: u32) -> RgbaImage {
+    let mut cropped = RgbaImage::new(width, height);
+
+    // Проверяем что область внутри изображения
+    if x + width > image.width() || y + height > image.height() {
+        // Фоллбэк на по-пиксельную копию с проверкой границ
+        return crop_region_safe(image, x, y, width, height);
+    }
+
+    // Быстрая копия: строка за строкой
+    for cy in 0..height {
+        let src_row = y + cy;
+        for cx in 0..width {
+            let src_col = x + cx;
+            cropped.put_pixel(cx, cy, *image.get_pixel(src_col, src_row));
+        }
+    }
+
+    cropped
+}
+
+/// Безопасная копия с проверкой границ для каждого пикселя.
+fn crop_region_safe(image: &RgbaImage, x: u32, y: u32, width: u32, height: u32) -> RgbaImage {
     let mut cropped = RgbaImage::new(width, height);
 
     for cy in 0..height {
@@ -272,374 +353,33 @@ fn crop_region(image: &RgbaImage, x: u32, y: u32, width: u32, height: u32) -> Rg
     cropped
 }
 
-/// Вставить область в изображение
-fn paste_region(image: &mut RgbaImage, region: &RgbaImage, x: u32, y: u32) {
-    for cy in 0..region.height() {
-        for cx in 0..region.width() {
+/// Вставить область в изображение.
+///
+/// Оптимизированная версия.
+fn paste_region_fast(image: &mut RgbaImage, region: &RgbaImage, x: u32, y: u32) {
+    let (img_w, img_h) = image.dimensions();
+    let (reg_w, reg_h) = region.dimensions();
+
+    for cy in 0..reg_h {
+        let py = y + cy;
+        if py >= img_h {
+            break;
+        }
+        for cx in 0..reg_w {
             let px = x + cx;
-            let py = y + cy;
-            if px < image.width() && py < image.height() {
-                image.put_pixel(px, py, *region.get_pixel(cx, cy));
+            if px >= img_w {
+                break;
             }
+            image.put_pixel(px, py, *region.get_pixel(cx, cy));
         }
     }
-}
-
-/// Удалить текст из области (inpainting)
-fn erase_text_from_region(image: &mut RgbaImage, _padding: u32) {
-    let (width, height) = image.dimensions();
-
-    if width == 0 || height == 0 {
-        return;
-    }
-
-    // Вычисляем средний цвет границы
-    let border_color = compute_border_color(image);
-
-    // Заполняем область средним цветом с небольшим шумом
-    for y in 0..height {
-        for x in 0..width {
-            // Добавляем небольшой шум для естественности
-            let noise = ((x * y) % 7) as i16 - 3;
-            let r = ((border_color[0] as i16 + noise).clamp(0, 255) as u8);
-            let g = ((border_color[1] as i16 + noise).clamp(0, 255) as u8);
-            let b = ((border_color[2] as i16 + noise).clamp(0, 255) as u8);
-
-            image.put_pixel(x, y, Rgba([r, g, b, 255]));
-        }
-    }
-
-    // Применяем размытие для сглаживания
-    apply_box_blur(image, 2);
-}
-
-/// Вычислить средний цвет границы изображения
-fn compute_border_color(image: &RgbaImage) -> [u8; 4] {
-    let (width, height) = image.dimensions();
-    let mut samples = Vec::new();
-
-    let border_thickness = 2;
-
-    // Верхняя и нижняя границы
-    for x in 0..width {
-        for dy in 0..border_thickness {
-            samples.push(*image.get_pixel(x, dy));
-            if height > dy {
-                samples.push(*image.get_pixel(x, height - 1 - dy));
-            }
-        }
-    }
-
-    // Левая и правая границы
-    for y in 0..height {
-        for dx in 0..border_thickness {
-            samples.push(*image.get_pixel(dx, y));
-            if width > dx {
-                samples.push(*image.get_pixel(width - 1 - dx, y));
-            }
-        }
-    }
-
-    if samples.is_empty() {
-        return [255, 255, 255, 255];
-    }
-
-    let mut r_sum: u32 = 0;
-    let mut g_sum: u32 = 0;
-    let mut b_sum: u32 = 0;
-    let mut a_sum: u32 = 0;
-
-    for sample in &samples {
-        r_sum += sample[0] as u32;
-        g_sum += sample[1] as u32;
-        b_sum += sample[2] as u32;
-        a_sum += sample[3] as u32;
-    }
-
-    let count = samples.len() as u32;
-    [
-        (r_sum / count) as u8,
-        (g_sum / count) as u8,
-        (b_sum / count) as u8,
-        (a_sum / count) as u8,
-    ]
-}
-
-/// Применить box blur
-fn apply_box_blur(image: &mut RgbaImage, radius: u32) {
-    if radius == 0 {
-        return;
-    }
-
-    let (width, height) = image.dimensions();
-    let mut temp = image.clone();
-    let kernel_size = radius * 2 + 1;
-
-    for y in 0..height {
-        for x in 0..width {
-            let mut r_sum: u32 = 0;
-            let mut g_sum: u32 = 0;
-            let mut b_sum: u32 = 0;
-            let mut count: u32 = 0;
-
-            for ky in 0..kernel_size {
-                for kx in 0..kernel_size {
-                    let px = x.saturating_add(kx).saturating_sub(radius);
-                    let py = y.saturating_add(ky).saturating_sub(radius);
-
-                    if px < width && py < height {
-                        let pixel = image.get_pixel(px, py);
-                        r_sum += pixel[0] as u32;
-                        g_sum += pixel[1] as u32;
-                        b_sum += pixel[2] as u32;
-                        count += 1;
-                    }
-                }
-            }
-
-            if count > 0 {
-                temp.put_pixel(
-                    x,
-                    y,
-                    Rgba([
-                        (r_sum / count) as u8,
-                        (g_sum / count) as u8,
-                        (b_sum / count) as u8,
-                        255,
-                    ]),
-                );
-            }
-        }
-    }
-
-    *image = temp;
-}
-
-// ============================================================================
-// COLOR DETECTION
-// ============================================================================
-
-/// Определить оптимальный цвет текста и фона
-fn determine_text_color(image: &RgbaImage, width: u32, height: u32) -> (Rgba<u8>, Rgba<u8>) {
-    let mut r_sum: u32 = 0;
-    let mut g_sum: u32 = 0;
-    let mut b_sum: u32 = 0;
-    let mut count: u32 = 0;
-
-    for y in 0..height {
-        for x in 0..width {
-            let pixel = image.get_pixel(x, y);
-            r_sum += pixel[0] as u32;
-            g_sum += pixel[1] as u32;
-            b_sum += pixel[2] as u32;
-            count += 1;
-        }
-    }
-
-    let avg_brightness = if count > 0 {
-        (r_sum + g_sum + b_sum) as f32 / (count as f32 * 3.0)
-    } else {
-        128.0
-    };
-
-    // Если фон светлый - текст тёмный, иначе светлый
-    let text_color = if avg_brightness > 128.0 {
-        Rgba([20, 20, 20, 255])
-    } else {
-        Rgba([245, 245, 245, 255])
-    };
-
-    // Создаём подложку
-    let overlay_alpha = (0.3 * 255.0) as u8;
-    let bg_color = if avg_brightness > 128.0 {
-        Rgba([
-            (avg_brightness as u8).saturating_sub(30),
-            (avg_brightness as u8).saturating_sub(30),
-            (avg_brightness as u8).saturating_sub(30),
-            overlay_alpha,
-        ])
-    } else {
-        Rgba([
-            (avg_brightness as u8).saturating_add(30),
-            (avg_brightness as u8).saturating_add(30),
-            (avg_brightness as u8).saturating_add(30),
-            overlay_alpha,
-        ])
-    };
-
-    (text_color, bg_color)
-}
-
-// ============================================================================
-// BACKGROUND DRAWING
-// ============================================================================
-
-/// Нарисовать прямоугольник подложки
-fn draw_background_rect(
-    image: &mut RgbaImage,
-    x: u32,
-    y: u32,
-    width: u32,
-    height: u32,
-    color: Rgba<u8>,
-) {
-    let (img_width, img_height) = image.dimensions();
-
-    let x_end = (x + width).min(img_width);
-    let y_end = (y + height).min(img_height);
-
-    for py in y..y_end {
-        for px in x..x_end {
-            let existing = *image.get_pixel(px, py);
-            let blended = blend_pixels(existing, color);
-            image.put_pixel(px, py, blended);
-        }
-    }
-}
-
-// ============================================================================
-// FONT SIZE CALCULATION
-// ============================================================================
-
-/// Вычислить оптимальный размер шрифта
-fn calculate_optimal_font_size(
-    text: &str,
-    font: &Font,
-    box_width: u32,
-    box_height: u32,
-    params: &TextReplacementParams,
-) -> f32 {
-    let available_width = box_width.saturating_sub(params.text_padding * 2);
-    let available_height = box_height.saturating_sub(params.text_padding * 2);
-
-    if available_width == 0 || available_height == 0 {
-        return params.min_font_size;
-    }
-
-    // Коэффициент безопасности для учёта неточностей rasterization
-    let safety_factor = 0.85;
-    let safe_width = available_width as f32 * safety_factor;
-    let safe_height = available_height as f32 * safety_factor;
-
-    let mut low = params.min_font_size;
-    let mut high = params.max_font_size.min(available_height as f32);
-    let mut best_size = params.min_font_size;
-
-    while (high - low) > params.font_size_step / 2.0 {
-        let mid = (low + high) / 2.0;
-        let scale = Scale::uniform(mid);
-
-        let mut text_width = 0f32;
-        let mut max_glyph_height = 0f32;
-
-        for c in text.chars() {
-            let glyph = font.glyph(c).scaled(scale);
-            if let Some(rect) = glyph.exact_bounding_box() {
-                text_width += rect.width() as f32 * params.letter_spacing;
-                max_glyph_height = max_glyph_height.max(rect.height() as f32);
-            } else {
-                // Для пробелов
-                text_width += mid * 0.3 * params.letter_spacing;
-            }
-        }
-
-        if text_width <= safe_width && max_glyph_height <= safe_height {
-            best_size = mid;
-            low = mid + params.font_size_step;
-        } else {
-            high = mid - params.font_size_step;
-        }
-    }
-
-    best_size.max(params.min_font_size)
-}
-
-// ============================================================================
-// TEXT RENDERING
-// ============================================================================
-
-/// Нарисовать текст на изображении
-fn draw_text_on_image(
-    image: &mut RgbaImage,
-    text: &str,
-    x: f32,
-    y: f32,
-    width: u32,
-    height: u32,
-    font: &Font,
-    font_size: f32,
-    color: Rgba<u8>,
-    letter_spacing: f32,
-) {
-    let scale = Scale::uniform(font_size);
-
-    // Вычисляем размеры текста для позиционирования
-    let mut text_width = 0f32;
-    let mut max_glyph_height = 0f32;
-
-    for c in text.chars() {
-        let glyph = font.glyph(c).scaled(scale);
-        if let Some(rect) = glyph.exact_bounding_box() {
-            text_width = text_width.max(rect.max.x as f32);
-            max_glyph_height = max_glyph_height.max(rect.height() as f32);
-        }
-    }
-
-    // Позиционируем текст слева с вертикальным центрированием
-    let start_x = x;
-    let start_y = y + (height as f32 - max_glyph_height) / 2.0 + max_glyph_height;
-
-    let mut caret_x = start_x;
-
-    for c in text.chars() {
-        let glyph = font
-            .glyph(c)
-            .scaled(scale)
-            .positioned(rusttype::point(caret_x, start_y));
-
-        if let Some(rect) = glyph.pixel_bounding_box() {
-            glyph.draw(|gx, gy, alpha| {
-                let px = (rect.min.x + gx as i32) as u32;
-                let py = (rect.min.y + gy as i32) as u32;
-
-                let (img_width, img_height) = image.dimensions();
-                if px < img_width && py < img_height && alpha > 0.0 {
-                    let existing = *image.get_pixel(px, py);
-                    let text_with_alpha =
-                        Rgba([color[0], color[1], color[2], (alpha * 255.0) as u8]);
-                    let blended = blend_pixels(existing, text_with_alpha);
-                    image.put_pixel(px, py, blended);
-                }
-            });
-            caret_x += rect.width() as f32 * letter_spacing;
-        } else {
-            caret_x += font_size * letter_spacing * 0.3;
-        }
-    }
-}
-
-// ============================================================================
-// BLENDING
-// ============================================================================
-
-/// Смешать два пикселя с учётом альфа-канала
-fn blend_pixels(background: Rgba<u8>, foreground: Rgba<u8>) -> Rgba<u8> {
-    let fg_alpha = foreground[3] as f32 / 255.0;
-    let bg_alpha = 1.0 - fg_alpha;
-
-    Rgba([
-        ((background[0] as f32 * bg_alpha) + (foreground[0] as f32 * fg_alpha)) as u8,
-        ((background[1] as f32 * bg_alpha) + (foreground[1] as f32 * fg_alpha)) as u8,
-        ((background[2] as f32 * bg_alpha) + (foreground[2] as f32 * fg_alpha)) as u8,
-        255,
-    ])
 }
 
 // ============================================================================
 // UTILS
 // ============================================================================
 
-/// Конвертировать OcrWord в TranslatedBox
+/// Конвертировать OcrWord в TranslatedBox.
 pub fn ocr_word_to_translated_box(
     x: i32,
     y: i32,
@@ -655,5 +395,13 @@ pub fn ocr_word_to_translated_box(
         height: h,
         original_text: original.to_string(),
         translated_text: translated.to_string(),
+    }
+}
+
+/// Создать параметры для debug mode.
+pub fn debug_params() -> TextReplacementParams {
+    TextReplacementParams {
+        debug_mode: true,
+        ..Default::default()
     }
 }

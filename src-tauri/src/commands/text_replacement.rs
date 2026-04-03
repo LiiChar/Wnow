@@ -157,8 +157,9 @@ pub async fn translate_image_with_replacement(
             overlay_alpha: 0.3,
             min_font_size: 8.0,
             max_font_size: 48.0,
-            font_size_step: 0.5,
+            font_size_tolerance: 0.25,
             letter_spacing: 1.1,
+            ..Default::default()
         };
 
         // Выполняем замену текста

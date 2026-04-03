@@ -6,7 +6,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_log::log::{log, Level};
 
 use crate::capture::Capture;
-use crate::img::{ocr_word_to_translated_box, replace_text_in_image, TextReplacementParams};
+use crate::img::{ocr_word_to_translated_box, replace_text_in_image, TextReplacementParams, TranslatedBox};
 use crate::ocr::{postprocess_ocr, preprocess_for_tesseract_sys, recognize_with_boxes, OcrWord};
 use crate::platform::set_window_topmost;
 use crate::translation::local::get_translate_lang;
@@ -27,6 +27,46 @@ pub struct TranslatedFragment {
 pub struct TranslatedFragmentsPayload {
     pub fragments: Vec<TranslatedFragment>,
     pub processing_time_ms: u64,
+}
+
+/// Переиспользуемый буфер для PNG-кодирования
+struct PngEncodeBuffer {
+    buffer: Vec<u8>,
+}
+
+impl PngEncodeBuffer {
+    fn with_capacity(cap: usize) -> Self {
+        Self {
+            buffer: Vec::with_capacity(cap),
+        }
+    }
+
+    fn clear(&mut self) {
+        self.buffer.clear();
+    }
+
+    fn encode_to_base64(&mut self, image: &RgbaImage) -> Result<String, String> {
+        self.clear();
+        image
+            .write_to(&mut std::io::Cursor::new(&mut self.buffer), image::ImageFormat::Png)
+            .map_err(|e| format!("PNG encode error: {}", e))?;
+        Ok(base64::engine::general_purpose::STANDARD.encode(&self.buffer))
+    }
+}
+
+/// Вырезать фрагмент с проверкой границ
+fn crop_fragment(image: &RgbaImage, x: u32, y: u32, w: u32, h: u32) -> RgbaImage {
+    let (img_w, img_h) = image.dimensions();
+    let x = x.min(img_w);
+    let y = y.min(img_h);
+    let w = w.min(img_w - x);
+    let h = h.min(img_h - y);
+
+    if w == 0 || h == 0 {
+        return RgbaImage::new(1, 1);
+    }
+
+    image::imageops::crop_imm(image, x, y, w, h).to_image()
 }
 
 /// Основная функция
@@ -71,12 +111,11 @@ pub async fn show_translate_with_replacement(app: &AppHandle) {
     )
     .await;
 
-    let mut translated_boxes = Vec::new();
+    let mut translated_boxes: Vec<TranslatedBox> = Vec::with_capacity(boxes.len());
 
     for (i, result) in results.into_iter().enumerate() {
         if let Ok(translated) = result {
             let original = &boxes[i];
-
             translated_boxes.push(ocr_word_to_translated_box(
                 original.x,
                 original.y,
@@ -88,8 +127,13 @@ pub async fn show_translate_with_replacement(app: &AppHandle) {
         }
     }
 
-    // 5. Работа с изображением
-    let rgba_image = match RgbaImage::from_raw(phys_w, phys_h, buffer.clone()) {
+    if translated_boxes.is_empty() {
+        fallback_to_normal_translate(app, &boxes).await;
+        return;
+    }
+
+    // 5. Создаём RgbaImage из буфера
+    let rgba_image = match RgbaImage::from_raw(phys_w, phys_h, buffer) {
         Some(img) => img,
         None => {
             fallback_to_normal_translate(app, &boxes).await;
@@ -97,67 +141,52 @@ pub async fn show_translate_with_replacement(app: &AppHandle) {
         }
     };
 
+    // 6. Batch-обработка: все боксы за один проход на полном изображении
     let replacement_params = TextReplacementParams::default();
-    let mut fragments = Vec::new();
+    let result = match replace_text_in_image(&rgba_image, &translated_boxes, &replacement_params) {
+        Ok(r) => r,
+        Err(e) => {
+            log!(Level::Error, "[show_translate_with_replacement] Replacement error: {}", e);
+            fallback_to_normal_translate(app, &boxes).await;
+            return;
+        }
+    };
 
-    // 🔥 Главный цикл — делаем куски
+    // 7. Извлекаем фрагменты из ЕДИНОГО обработанного изображения
+    let processed = &result.image;
+    let mut png_buffer = PngEncodeBuffer::with_capacity(phys_w as usize * phys_h as usize * 4);
+    let mut fragments = Vec::with_capacity(translated_boxes.len());
+
     for tb in &translated_boxes {
-        // 1. Вырезаем кусок
-        let sub_image = image::imageops::crop_imm(
-            &rgba_image,
-            tb.x as u32,
-            tb.y as u32,
-            tb.width as u32,
-            tb.height as u32,
-        )
-        .to_image();
+        let x = tb.x.max(0) as u32;
+        let y = tb.y.max(0) as u32;
+        let w = tb.width.max(0) as u32;
+        let h = tb.height.max(0) as u32;
 
-        // 2. Делаем локальный бокс (ВАЖНО)
-        let local_box = ocr_word_to_translated_box(
-            0,
-            0,
-            tb.width,
-            tb.height,
-            &tb.original_text,
-            &tb.translated_text,
-        );
+        if w == 0 || h == 0 {
+            continue;
+        }
 
-        // 3. Заменяем текст внутри куска
-        match replace_text_in_image(&sub_image, &[local_box], &replacement_params) {
-            Ok(result) => {
-                let mut img_buffer = Vec::new();
+        let fragment = crop_fragment(processed, x, y, w, h);
 
-                if result
-                    .image
-                    .write_to(
-                        &mut std::io::Cursor::new(&mut img_buffer),
-                        image::ImageFormat::Png,
-                    )
-                    .is_ok()
-                {
-                    let base64_image =
-                        base64::engine::general_purpose::STANDARD.encode(&img_buffer);
-
-                    fragments.push(TranslatedFragment {
-                        image: base64_image,
-                        x: tb.x,
-                        y: tb.y,
-                        w: tb.width,
-                        h: tb.height,
-                    });
-                }
-            }
-            Err(e) => {
-                log!(Level::Error, "Fragment replace failed: {}", e);
-            }
+        if let Ok(base64_image) = png_buffer.encode_to_base64(&fragment) {
+            fragments.push(TranslatedFragment {
+                image: base64_image,
+                x: tb.x,
+                y: tb.y,
+                w: tb.width,
+                h: tb.height,
+            });
         }
     }
 
     log!(
         Level::Info,
-        "Fragments created: {}, total time: {:?}",
+        "Fragments: {}, replacement time: {}ms, total: {:?}, avg font: {:.1}",
         fragments.len(),
-        start_total.elapsed()
+        result.stats.processing_time_ms,
+        start_total.elapsed(),
+        result.stats.avg_font_size
     );
 
     // Overlay активируем
@@ -167,7 +196,7 @@ pub async fn show_translate_with_replacement(app: &AppHandle) {
         set_window_topmost(&overlay);
     }
 
-    // 6. Отправка
+    // 8. Отправка
     app.emit_to(
         "overlay",
         "show_translate_fragments",
@@ -190,5 +219,5 @@ async fn fallback_to_normal_translate(app: &AppHandle, boxes: &[OcrWord]) {
     }
 
     app.emit_to("overlay", "show_translate", boxes)
-        .expect("Failed to emit show_translate");
+        .unwrap_or_else(|e| log!(Level::Error, "Failed to emit show_translate: {}", e));
 }
