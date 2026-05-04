@@ -9,7 +9,8 @@
       "Bash(mkdir *)",
       "Bash(select-string *)",
       "Bash(findstr *)",
-      "Bash(move *)"
+      "Bash(move *)",
+      "Bash(cargo build)"
     ]
   },
   "$version": 3

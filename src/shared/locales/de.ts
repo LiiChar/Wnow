@@ -116,6 +116,7 @@ export const de: Locale = {
 			translateScreen: 'Gesamten Bildschirm übersetzen',
 			translateClipboard: 'Ausgewählten Text übersetzen',
 			restartRequired: '* Hotkey-Änderungen werden nach App-Neustart wirksam',
+			translateClose: 'Overlay schließen',
 		},
 		behavior: {
 			title: 'Verhalten',

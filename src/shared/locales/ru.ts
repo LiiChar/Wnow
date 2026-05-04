@@ -132,6 +132,7 @@ export const ru: Locale = {
 			translateScreen: 'Перевод всего экрана',
 			translateClipboard: 'Перевод выделенного текста',
 			restartRequired: '* Изменения горячих клавиш вступят в силу после перезапуска приложения',
+			translateClose: 'Закрыть overlay',
 		},
 		behavior: {
 			title: 'Поведение',

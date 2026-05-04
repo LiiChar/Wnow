@@ -516,6 +516,18 @@ export const SettingsPage = () => {
 						</div>
 					</div>
 
+					<div class='flex items-start gap-3 p-0 py-1 '>
+						<div class='flex-1'>
+							<HotkeyInput
+								label={t().settings.hotkeys.translateClose}
+								value={settingsStore.hotkey_translate_close}
+								onChange={v =>
+									updateSettings({ hotkey_translate_close: v })
+								}
+							/>
+						</div>
+					</div>
+
 					<p class='text-xs text-neutral-500 pt-2 border-t border-border'>
 						{t().settings.hotkeys.restartRequired}
 					</p>

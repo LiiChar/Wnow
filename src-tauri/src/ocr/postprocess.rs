@@ -6,6 +6,58 @@ const LINE_Y_THRESHOLD: i32 = 10;
 const MAX_WORD_GAP: i32 = 20;
 const MAX_LEV_DISTANCE: usize = 2;
 
+/// Разбивает распознанную OCR строку на отдельные слова
+/// OCR часто возвращает целые фразы как один блок, нужно разделить их
+pub fn split_ocr_to_words(words: Vec<OcrWord>) -> Vec<OcrWord> {
+    let mut result = Vec::new();
+
+    for word in words {
+        let text = word.text.trim();
+        
+        // Если текст содержит пробелы - разбиваем на слова
+        if text.contains(' ') || text.contains('\t') {
+            let parts: Vec<&str> = text.split_whitespace().collect();
+            
+            if parts.len() > 1 {
+                // Вычисляем ширину одного символа пропорционально
+                let char_width = if text.len() > 0 {
+                    word.w as f32 / text.len() as f32
+                } else {
+                    0.0
+                };
+
+                let mut current_x = word.x;
+                
+                for part in parts {
+                    let part_width = (part.len() as f32 * char_width) as i32;
+                    
+                    result.push(OcrWord {
+                        id: None,
+                        text: part.to_string(),
+                        x: current_x,
+                        y: word.y,
+                        w: part_width,
+                        h: word.h,
+                        translation: None,
+                        image: None
+                    });
+
+                    // Сдвигаем X на ширину слова + небольшой gap
+                    current_x += part_width + 2;
+                }
+            } else {
+                // Пробелы есть но split_whitespace вернул 1 элемент - оставляем как есть
+                result.push(word);
+            }
+        } else {
+            // Одно слово без пробелов - оставляем как есть
+            result.push(word);
+        }
+    }
+
+    result
+}
+
 static DICTIONARY: &[&str] = &[
     "привет",
     "пока",

@@ -100,6 +100,17 @@ pub fn render_text(
     font: &Font,
     params: &TextRenderParams,
 ) -> TextRenderResult {
+    let (img_width, img_height) = image.dimensions();
+    // Клип по границам контейнера: глифы и bold-смещение не заливают соседние OCR-боксы
+    let clip_x0 = x.max(0.0).floor() as i32;
+    let clip_y0 = y.max(0.0).floor() as i32;
+    let clip_x1 = (x + container_width)
+        .min(img_width as f32)
+        .ceil() as i32;
+    let clip_y1 = (y + container_height)
+        .min(img_height as f32)
+        .ceil() as i32;
+
     // Доступная область внутри паддингов
     let avail_width = container_width - params.padding * 2.0;
     let avail_height = container_height - params.padding * 2.0;
@@ -194,6 +205,10 @@ pub fn render_text(
             offset_y + baseline_y,
             font,
             params,
+            clip_x0,
+            clip_y0,
+            clip_x1,
+            clip_y1,
         );
 
         // Bold simulation
@@ -205,6 +220,10 @@ pub fn render_text(
                 offset_y + baseline_y + params.bold_offset * 0.5,
                 font,
                 params,
+                clip_x0,
+                clip_y0,
+                clip_x1,
+                clip_y1,
             );
         }
     }
@@ -252,6 +271,10 @@ fn render_single_line(
     baseline_y: f32,
     font: &Font,
     params: &TextRenderParams,
+    clip_x0: i32,
+    clip_y0: i32,
+    clip_x1: i32,
+    clip_y1: i32,
 ) {
     let scale = Scale::uniform(params.font_size);
     let mut caret_x = start_x;
@@ -267,11 +290,20 @@ fn render_single_line(
         if let Some(bounding_box) = glyph.pixel_bounding_box() {
             // Рендерим глиф
             glyph.draw(|gx, gy, alpha| {
-                let px = (bounding_box.min.x + gx as i32) as u32;
-                let py = (bounding_box.min.y + gy as i32) as u32;
+                let px_i = bounding_box.min.x + gx as i32;
+                let py_i = bounding_box.min.y + gy as i32;
+                if px_i < clip_x0 || px_i >= clip_x1 || py_i < clip_y0 || py_i >= clip_y1 {
+                    return;
+                }
+                if alpha <= 0.01 {
+                    return;
+                }
+
+                let px = px_i as u32;
+                let py = py_i as u32;
 
                 let (img_width, img_height) = image.dimensions();
-                if px < img_width && py < img_height && alpha > 0.01 {
+                if px < img_width && py < img_height {
                     let existing = *image.get_pixel(px, py);
                     let text_pixel = Rgba([
                         params.text_color[0],
@@ -416,7 +448,7 @@ mod tests {
     use super::*;
 
     fn get_test_font() -> Font<'static> {
-        let font_data: &[u8] = include_bytes!("../../../../resources/fonts/NotoSans-Regular.ttf");
+        let font_data: &[u8] = include_bytes!("../../resources/fonts/NotoSans-Regular.ttf");
         Font::try_from_bytes(font_data).expect("Failed to load test font")
     }
 

@@ -24,6 +24,10 @@ pub fn register_shortcuts_from_settings(app: &AppHandle, settings: &AppSettings)
     if let Some(shortcut) = parse_hotkey(&settings.hotkey_translate_clipboard) {
         app.global_shortcut().register(shortcut).ok();
     }
+
+    if let Some(shortcut) = parse_hotkey(&settings.hotkey_translate_close) {
+        app.global_shortcut().register(shortcut).ok();
+    }
 }
 
 /// Отменяет регистрацию всех горячих клавиш

@@ -317,13 +317,15 @@ pub fn calculate_optimal_font_size(
         return params.min_font_size;
     }
 
-    // Safety factor для учёта неточностей растеризации
-    let safety_factor = 0.90;
+    // Небольшой запас для растеризации; слишком агрессивный множитель даёт слишком мелкий шрифт
+    let safety_factor = 0.94;
     let safe_width = params.available_width * safety_factor;
     let safe_height = params.available_height * safety_factor;
 
     let mut low = params.min_font_size;
-    let mut high = params.max_font_size.min(params.available_height);
+    let mut high = params
+        .max_font_size
+        .min(params.available_height.max(params.min_font_size));
     let mut best_size = params.min_font_size;
 
     while (high - low) > params.tolerance {
@@ -349,7 +351,54 @@ pub fn calculate_optimal_font_size(
         }
     }
 
-    best_size.max(params.min_font_size)
+    let base = best_size.max(params.min_font_size);
+    refine_font_size_upward(text, font, base, params)
+}
+
+/// После бинарного поиска слегка увеличиваем шрифт по «жёстким» границам контейнера,
+/// чтобы визуально лучше заполнять бокс без пересечения с соседними при клипе.
+fn refine_font_size_upward(
+    text: &str,
+    font: &Font,
+    mut size: f32,
+    params: &LayoutParams,
+) -> f32 {
+    if params.available_width < MIN_PADDING || params.available_height < MIN_PADDING {
+        return size;
+    }
+
+    const STEP: f32 = 0.35;
+    const MAX_STEPS: u32 = 48;
+
+    for _ in 0..MAX_STEPS {
+        let next = (size + STEP).min(params.max_font_size).min(params.available_height);
+        if next <= size + 1e-4 {
+            break;
+        }
+
+        let wrapped = wrap_text(
+            text,
+            font,
+            next,
+            params.available_width,
+            params.letter_spacing,
+        );
+        let dims = measure_multiline_text(
+            &wrapped.lines,
+            font,
+            next,
+            params.letter_spacing,
+            params.line_height_ratio,
+        );
+
+        if dims.width <= params.available_width && dims.height <= params.available_height {
+            size = next;
+        } else {
+            break;
+        }
+    }
+
+    size
 }
 
 /// Рассчитать вертикальное смещение для центрирования текста.
@@ -407,7 +456,7 @@ mod tests {
         // В тестах используем минимальный шрифт
         // Для реальных тестов нужен настоящий шрифт
         // Здесь — заглушка для проверки логики
-        let font_data: &[u8] = include_bytes!("../../../../resources/fonts/NotoSans-Regular.ttf");
+        let font_data: &[u8] = include_bytes!("../../resources/fonts/NotoSans-Regular.ttf");
         Font::try_from_bytes(font_data).expect("Failed to load test font")
     }
 

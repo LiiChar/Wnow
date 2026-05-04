@@ -15,6 +15,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   hotkey_translate_area: 'Ctrl+Y',
   hotkey_translate_screen: 'Ctrl+T',
   hotkey_translate_clipboard: 'Ctrl+Shift+C',
+  hotkey_translate_close: 'Ctrl+I',
   auto_save_words: false,
   show_notifications: true,
   minimize_to_tray: true,

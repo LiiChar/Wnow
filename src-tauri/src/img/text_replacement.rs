@@ -65,12 +65,12 @@ pub struct TextReplacementParams {
 impl Default for TextReplacementParams {
     fn default() -> Self {
         Self {
-            mask_padding: 4,
-            text_padding: 6,
+            mask_padding: 1,
+            text_padding: 2,
             overlay_alpha: 0.25,
-            min_font_size: 8.0,
+            min_font_size: 11.0,
             max_font_size: 72.0,
-            font_size_tolerance: 0.25,
+            font_size_tolerance: 0.1,
             letter_spacing: 1.1,
             line_height_ratio: 1.2,
             use_edge_aware_bg: false,
@@ -148,8 +148,17 @@ pub fn replace_text_in_image(
     let mut total_lines = 0;
     let mut successful_boxes = 0;
 
+    let mut ordered: Vec<&TranslatedBox> = boxes.iter().collect();
+    // Стабильный порядок: сверху вниз, слева направо; при перекрытии позже нарисованный бокс сверху
+    ordered.sort_by(|a, b| {
+        a.y
+            .cmp(&b.y)
+            .then_with(|| a.x.cmp(&b.x))
+            .then_with(|| a.width.cmp(&b.width))
+    });
+
     // Обрабатываем каждый бокс
-    for box_item in boxes {
+    for box_item in ordered {
         match process_single_box(&mut result_image, box_item, font, params) {
             Ok(result) => {
                 total_font_size += result.font_size;
@@ -241,8 +250,15 @@ fn process_single_box(
     // --- Шаг 5: Стираем текст (background reconstruction) ---
     erase_text_from_image(&mut cropped, params.use_edge_aware_bg, params.bg_blur_radius);
 
-    // --- Шаг 6: Вставляем обработанную область обратно ---
-    paste_region_fast(image, &cropped, box_x, box_y);
+    // --- Шаг 6: Вставляем только прямоугольник OCR (без полей mask_padding) ---
+    // Иначе размытая область вокруг бокса перезаписывает соседние блоки и ломает их рендер.
+    paste_crop_rect_for_box(
+        image,
+        &cropped,
+        x_start_i,
+        y_start_i,
+        box_item,
+    );
 
     // --- Шаг 7: Определяем цвет текста и фона ---
     let (text_color, bg_color) = determine_text_and_bg_colors(&cropped, params.overlay_alpha);
@@ -353,24 +369,43 @@ fn crop_region_safe(image: &RgbaImage, x: u32, y: u32, width: u32, height: u32) 
     cropped
 }
 
-/// Вставить область в изображение.
-///
-/// Оптимизированная версия.
-fn paste_region_fast(image: &mut RgbaImage, region: &RgbaImage, x: u32, y: u32) {
+/// Вставить из crop только те пиксели, что попадают в OCR-бокс (в координатах полного кадра).
+fn paste_crop_rect_for_box(
+    image: &mut RgbaImage,
+    crop: &RgbaImage,
+    crop_origin_x: i32,
+    crop_origin_y: i32,
+    box_item: &TranslatedBox,
+) {
     let (img_w, img_h) = image.dimensions();
-    let (reg_w, reg_h) = region.dimensions();
+    let bx0 = box_item.x.max(0);
+    let by0 = box_item.y.max(0);
+    let bx1 = (box_item.x + box_item.width).min(img_w as i32);
+    let by1 = (box_item.y + box_item.height).min(img_h as i32);
+    if bx1 <= bx0 || by1 <= by0 {
+        return;
+    }
 
-    for cy in 0..reg_h {
-        let py = y + cy;
-        if py >= img_h {
-            break;
+    let (cw, ch) = crop.dimensions();
+    for py in by0..by1 {
+        let sy = py - crop_origin_y;
+        if sy < 0 {
+            continue;
         }
-        for cx in 0..reg_w {
-            let px = x + cx;
-            if px >= img_w {
-                break;
+        let sy = sy as u32;
+        if sy >= ch {
+            continue;
+        }
+        for px in bx0..bx1 {
+            let sx = px - crop_origin_x;
+            if sx < 0 {
+                continue;
             }
-            image.put_pixel(px, py, *region.get_pixel(cx, cy));
+            let sx = sx as u32;
+            if sx >= cw {
+                continue;
+            }
+            image.put_pixel(px as u32, py as u32, *crop.get_pixel(sx, sy));
         }
     }
 }

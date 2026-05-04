@@ -54,7 +54,10 @@ export const TranslatorOverlay = () => {
 		});
 
 		add<void>('close_translate', () => {
+			setBoxes([]);
+			setFullText('');
 			setFloatingTranslation(null);
+			setCursorEvents(false);
 		});
 
 		onCleanup(() => {

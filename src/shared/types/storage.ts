@@ -45,6 +45,7 @@ export interface AppSettings {
   hotkey_translate_area: string;
   hotkey_translate_screen: string;
   hotkey_translate_clipboard: string;
+  hotkey_translate_close: string;
   auto_save_words: boolean;
   show_notifications: boolean;
   minimize_to_tray: boolean;

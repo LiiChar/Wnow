@@ -437,6 +437,9 @@ impl Database {
         if let Some(v) = Self::get_setting("hotkey_translate_clipboard") {
             settings.hotkey_translate_clipboard = v;
         }
+        if let Some(v) = Self::get_setting("hotkey_translate_close") {
+            settings.hotkey_translate_close = v;
+        }
         if let Some(v) = Self::get_setting("auto_save_words") {
             settings.auto_save_words = v == "true";
         }
@@ -500,6 +503,7 @@ impl Database {
         Self::set_setting("hotkey_translate_area", &settings.hotkey_translate_area)?;
         Self::set_setting("hotkey_translate_screen", &settings.hotkey_translate_screen)?;
         Self::set_setting("hotkey_translate_clipboard", &settings.hotkey_translate_clipboard)?;
+        Self::set_setting("hotkey_translate_close", &settings.hotkey_translate_close)?;
         Self::set_setting(
             "auto_save_words",
             if settings.auto_save_words {

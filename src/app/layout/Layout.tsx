@@ -1,13 +1,16 @@
-import { ParentProps, onMount } from 'solid-js';
-import { Header } from './Header';
-import { Footer } from './Footer';
-import { ToastRegion, useToast, setToastCallback, ToastListWithToasts } from '@/components/ui/Toast';
+import type { ParentProps} from 'solid-js';
 
-export function Layout(props: ParentProps) {
+import { onMount } from 'solid-js';
+
+import { setToastCallback, ToastListWithToasts, ToastRegion, useToast } from '@/components/ui/Toast';
+
+import { Footer } from './Footer';
+import { Header } from './Header';
+
+export const Layout = (props: ParentProps) => {
 	const toastState = useToast();
 
 	onMount(() => {
-		// Set global callback for imperative toast creation
 		setToastCallback(toastState.createToast);
 	});
 

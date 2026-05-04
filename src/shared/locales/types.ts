@@ -112,6 +112,7 @@ export interface Locale {
 			translateWord: string;
 			translateArea: string;
 			translateScreen: string;
+			translateClose: string;
 			translateClipboard: string;
 			restartRequired: string;
 		};

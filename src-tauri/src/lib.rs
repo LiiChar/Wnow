@@ -40,7 +40,7 @@ pub struct ActiveShortcuts {
     pub translate_area: Shortcut,
     pub translate_word: Shortcut,
     pub translate_clipboard: Shortcut,
-    pub close_translate: Shortcut,
+    pub translate_close: Shortcut,
 }
 
 impl ActiveShortcuts {
@@ -54,7 +54,7 @@ impl ActiveShortcuts {
                 .unwrap_or_else(|| Shortcut::new(Some(Modifiers::CONTROL), Code::KeyU)),
             translate_clipboard: parse_hotkey(&settings.hotkey_translate_clipboard)
                 .unwrap_or_else(|| Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyC)),
-            close_translate: Shortcut::new(Some(Modifiers::CONTROL), Code::KeyI),
+            translate_close: Shortcut::new(Some(Modifiers::CONTROL), Code::KeyI),
         }
     }
 }
@@ -112,7 +112,7 @@ pub fn run() {
                                     _ => {}
                                 }
                             }
-                            if shortcut == &state.close_translate {
+                            if shortcut == &state.translate_close {
                                 match event.state() {
                                     GlobalShortcutState::Released => {
                                         app.emit_to("overlay", "close_translate", ()).ok();
