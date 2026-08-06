@@ -5,7 +5,7 @@ use crate::storage::Database;
 use crate::translation::local::get_translate_lang;
 use crate::get_resource_dir;
 use crate::ocr::{postprocess_ocr, preprocess_for_tesseract_sys, recognize_with_boxes, OcrWord};
-use crate::translation::translate as t;
+use crate::translation::{translate as t, translate_ordered_fragments_with_context};
 use crate::utils::fnv1a_hash;
 use base64::Engine;
 use futures::future::join_all;
@@ -70,42 +70,68 @@ pub fn get_block_translate(
 
     let uniq_id = fnv1a_hash(text.as_bytes());
 
-    let mut requests = vec![text.clone()];
-    requests.extend(clear_boxes.iter().map(|b| b.text.clone()));
-
-    // 👇 блокируем async внутри sync функции
-    let results = tauri::async_runtime::block_on(join_all(
-        requests.into_iter().map(|text| t(text, &source_lang, &target_lang)),
-    ));
-
-    let mut translated_text = text.clone();
-    let mut translated_boxes = Vec::with_capacity(clear_boxes.len());
-
-    for (i, result) in results.into_iter().enumerate() {
-        if let Ok(translated) = result {
-            if i == 0 {
-                log!(
-                    Level::Info,
-                    "[translate] translated text: {}, source: {}",
-                    translated,
-                    text.clone()
-                );
-                translated_text = translated;
-            } else {
-                let b = &clear_boxes[i - 1];
-
-                translated_boxes.push(OcrWord {
-                    id: Some(uniq_id.to_string()),
-                    x: b.x,
-                    y: b.y,
-                    w: b.w,
-                    h: b.h,
-                    text: b.text.clone(),
-                    translation: Some(translated),
-                    image: None
-                });
-            }
+    let translated_text = match tauri::async_runtime::block_on(t(
+        text.clone(),
+        &source_lang,
+        &target_lang,
+    )) {
+        Ok(s) => {
+            log!(
+                Level::Info,
+                "[translate] translated text: {}, source: {}",
+                s,
+                text.clone()
+            );
+            s
         }
+        Err(_) => text.clone(),
+    };
+
+    let mut sorted_ix: Vec<usize> = (0..clear_boxes.len()).collect();
+    sorted_ix.sort_by_key(|&i| (clear_boxes[i].y, clear_boxes[i].x));
+    let ordered_texts: Vec<String> = sorted_ix.iter().map(|&i| clear_boxes[i].text.clone()).collect();
+
+    let line_translations: Vec<String> = match tauri::async_runtime::block_on(
+        translate_ordered_fragments_with_context(
+            ordered_texts,
+            &source_lang,
+            &target_lang,
+        ),
+    ) {
+        Ok(v) if v.len() == sorted_ix.len() => v,
+        _ => tauri::async_runtime::block_on(join_all(
+            sorted_ix.iter().map(|&i| {
+                t(
+                    clear_boxes[i].text.clone(),
+                    &source_lang,
+                    &target_lang,
+                )
+            }),
+        ))
+        .into_iter()
+        .filter_map(|r| r.ok())
+        .collect(),
+    };
+
+    let mut translated_boxes = Vec::with_capacity(sorted_ix.len());
+
+    for (ord, &i) in sorted_ix.iter().enumerate() {
+        let translated = line_translations
+            .get(ord)
+            .cloned()
+            .unwrap_or_else(|| clear_boxes[i].text.clone());
+        let b = &clear_boxes[i];
+
+        translated_boxes.push(OcrWord {
+            id: Some(uniq_id.to_string()),
+            x: b.x,
+            y: b.y,
+            w: b.w,
+            h: b.h,
+            text: b.text.clone(),
+            translation: Some(translated),
+            image: None,
+        });
     }
 
     Ok((translated_text, translated_boxes))
@@ -137,39 +163,66 @@ pub fn get_block_image_translate(
 
     let uniq_id = fnv1a_hash(text.as_bytes());
 
-    // 2. Перевод
-    let mut requests = vec![text.clone()];
-    requests.extend(clear_boxes.iter().map(|b| b.text.clone()));
-
-    let results = tauri::async_runtime::block_on(join_all(
-        requests.into_iter().map(|text| t(text, &source_lang, &target_lang)),
-    ));
-
-    let mut translated_text = text.clone();
-    let mut translated_boxes: Vec<crate::img::TranslatedBox> = Vec::with_capacity(clear_boxes.len());
-
-    for (i, result) in results.into_iter().enumerate() {
-        if let Ok(translated) = result {
-            if i == 0 {
-                log!(
-                    Level::Info,
-                    "[translate] translated text: {}, source: {}",
-                    translated,
-                    text
-                );
-                translated_text = translated;
-            } else {
-                let b = &clear_boxes[i - 1];
-                translated_boxes.push(ocr_word_to_translated_box(
-                    b.x,
-                    b.y,
-                    b.w,
-                    b.h,
-                    &b.text,
-                    &translated,
-                ));
-            }
+    // 2. Перевод (целый текст + строки с межстрочным контекстом)
+    let translated_text = match tauri::async_runtime::block_on(t(
+        text.clone(),
+        &source_lang,
+        &target_lang,
+    )) {
+        Ok(s) => {
+            log!(
+                Level::Info,
+                "[translate] translated text: {}, source: {}",
+                s,
+                text
+            );
+            s
         }
+        Err(_) => text.clone(),
+    };
+
+    let mut sorted_ix: Vec<usize> = (0..clear_boxes.len()).collect();
+    sorted_ix.sort_by_key(|&i| (clear_boxes[i].y, clear_boxes[i].x));
+    let ordered_texts: Vec<String> = sorted_ix.iter().map(|&i| clear_boxes[i].text.clone()).collect();
+
+    let line_translations: Vec<String> = match tauri::async_runtime::block_on(
+        translate_ordered_fragments_with_context(
+            ordered_texts,
+            &source_lang,
+            &target_lang,
+        ),
+    ) {
+        Ok(v) if v.len() == sorted_ix.len() => v,
+        _ => tauri::async_runtime::block_on(join_all(
+            sorted_ix.iter().map(|&i| {
+                t(
+                    clear_boxes[i].text.clone(),
+                    &source_lang,
+                    &target_lang,
+                )
+            }),
+        ))
+        .into_iter()
+        .filter_map(|r| r.ok())
+        .collect(),
+    };
+
+    let mut translated_boxes: Vec<crate::img::TranslatedBox> = Vec::with_capacity(sorted_ix.len());
+
+    for (ord, &i) in sorted_ix.iter().enumerate() {
+        let translated = line_translations
+            .get(ord)
+            .cloned()
+            .unwrap_or_else(|| clear_boxes[i].text.clone());
+        let b = &clear_boxes[i];
+        translated_boxes.push(ocr_word_to_translated_box(
+            b.x,
+            b.y,
+            b.w,
+            b.h,
+            &b.text,
+            &translated,
+        ));
     }
 
     if translated_boxes.is_empty() {
@@ -302,33 +355,59 @@ pub async fn start_floating_image_translate(
 
                 let uniq_id = fnv1a_hash(text.as_bytes());
 
-                // Перевод
-                let mut requests = vec![text.clone()];
-                requests.extend(clear_boxes.iter().map(|b| b.text.clone()));
+                let translated_text = match tauri::async_runtime::block_on(t(
+                    text.clone(),
+                    &source_lang,
+                    &target_lang,
+                )) {
+                    Ok(s) => s,
+                    Err(_) => text.clone(),
+                };
 
-                let results = tauri::async_runtime::block_on(join_all(
-                    requests.into_iter().map(|text| t(text, &source_lang, &target_lang)),
-                ));
+                let mut sorted_ix: Vec<usize> = (0..clear_boxes.len()).collect();
+                sorted_ix.sort_by_key(|&i| (clear_boxes[i].y, clear_boxes[i].x));
+                let ordered_texts: Vec<String> =
+                    sorted_ix.iter().map(|&i| clear_boxes[i].text.clone()).collect();
 
-                let mut translated_text = text.clone();
-                let mut translated_boxes: Vec<crate::img::TranslatedBox> = Vec::with_capacity(clear_boxes.len());
+                let line_translations: Vec<String> = match tauri::async_runtime::block_on(
+                    translate_ordered_fragments_with_context(
+                        ordered_texts,
+                        &source_lang,
+                        &target_lang,
+                    ),
+                ) {
+                    Ok(v) if v.len() == sorted_ix.len() => v,
+                    _ => tauri::async_runtime::block_on(join_all(
+                        sorted_ix.iter().map(|&i| {
+                            t(
+                                clear_boxes[i].text.clone(),
+                                &source_lang,
+                                &target_lang,
+                            )
+                        }),
+                    ))
+                    .into_iter()
+                    .filter_map(|r| r.ok())
+                    .collect(),
+                };
 
-                for (i, result) in results.into_iter().enumerate() {
-                    if let Ok(translated) = result {
-                        if i == 0 {
-                            translated_text = translated;
-                        } else {
-                            let b = &clear_boxes[i - 1];
-                            translated_boxes.push(ocr_word_to_translated_box(
-                                b.x,
-                                b.y,
-                                b.w,
-                                b.h,
-                                &b.text,
-                                &translated,
-                            ));
-                        }
-                    }
+                let mut translated_boxes: Vec<crate::img::TranslatedBox> =
+                    Vec::with_capacity(sorted_ix.len());
+
+                for (ord, &i) in sorted_ix.iter().enumerate() {
+                    let translated = line_translations
+                        .get(ord)
+                        .cloned()
+                        .unwrap_or_else(|| clear_boxes[i].text.clone());
+                    let b = &clear_boxes[i];
+                    translated_boxes.push(ocr_word_to_translated_box(
+                        b.x,
+                        b.y,
+                        b.w,
+                        b.h,
+                        &b.text,
+                        &translated,
+                    ));
                 }
 
                 // Захват изображения

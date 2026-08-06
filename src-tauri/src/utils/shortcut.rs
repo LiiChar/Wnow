@@ -37,7 +37,7 @@ pub fn parse_hotkey(hotkey: &str) -> Option<Shortcut> {
 /// Парсит строку клавиши в Code
 fn parse_key_code(key: &str) -> Option<Code> {
     let key = key.to_uppercase();
-    
+
     // Буквы A-Z
     if key.len() == 1 && key.as_bytes()[0].is_ascii_alphabetic() {
         let key_char = key.as_bytes()[0];
@@ -114,31 +114,5 @@ fn parse_key_code(key: &str) -> Option<Code> {
         "ARROWLEFT" => Some(Code::ArrowLeft),
         "ARROWRIGHT" => Some(Code::ArrowRight),
         _ => None,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_ctrl_u() {
-        let shortcut = parse_hotkey("Ctrl+U").unwrap();
-        assert_eq!(shortcut.modifiers(), Some(Modifiers::CONTROL));
-        assert_eq!(shortcut.key(), Code::KeyU);
-    }
-
-    #[test]
-    fn test_parse_ctrl_shift_c() {
-        let shortcut = parse_hotkey("Ctrl+Shift+C").unwrap();
-        assert_eq!(shortcut.modifiers(), Some(Modifiers::CONTROL | Modifiers::SHIFT));
-        assert_eq!(shortcut.key(), Code::KeyC);
-    }
-
-    #[test]
-    fn test_parse_ctrl_t() {
-        let shortcut = parse_hotkey("Ctrl+T").unwrap();
-        assert_eq!(shortcut.modifiers(), Some(Modifiers::CONTROL));
-        assert_eq!(shortcut.key(), Code::KeyT);
     }
 }

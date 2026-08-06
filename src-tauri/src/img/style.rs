@@ -191,6 +191,33 @@ pub fn calculate_average_brightness(image: &RgbaImage) -> f32 {
     sum / count as f32
 }
 
+/// Средний RGB по субдискретизации (для тонированной подложки под локальный фон).
+fn sample_average_rgb(image: &RgbaImage) -> (f32, f32, f32) {
+    let (width, height) = image.dimensions();
+    if width == 0 || height == 0 {
+        return (128.0, 128.0, 128.0);
+    }
+    let step = 4;
+    let mut r: f64 = 0.0;
+    let mut g: f64 = 0.0;
+    let mut b: f64 = 0.0;
+    let mut count: u64 = 0;
+    for y in (0..height).step_by(step as usize) {
+        for x in (0..width).step_by(step as usize) {
+            let p = image.get_pixel(x, y);
+            r += p[0] as f64;
+            g += p[1] as f64;
+            b += p[2] as f64;
+            count += 1;
+        }
+    }
+    if count == 0 {
+        return (128.0, 128.0, 128.0);
+    }
+    let n = count as f32;
+    (r as f32 / n, g as f32 / n, b as f32 / n)
+}
+
 /// Определить оптимальный цвет текста на основе яркости фона.
 ///
 /// Если фон светлый (>128) → тёмный текст, иначе светлый.
@@ -200,6 +227,7 @@ pub fn determine_text_and_bg_colors(
     overlay_alpha: f32,
 ) -> (Rgba<u8>, Rgba<u8>) {
     let avg_brightness = calculate_average_brightness(image);
+    let (ar, ag, ab) = sample_average_rgb(image);
 
     // Цвет текста
     let text_color = if avg_brightness > 128.0 {
@@ -208,20 +236,21 @@ pub fn determine_text_and_bg_colors(
         Rgba([245, 245, 245, 255])
     };
 
-    // Цвет подложки — слегка отличающийся от фона
+    // Подложка: лёгкий оттенок от реального RGB фона (не одна серая яркость) — строки выглядят согласованно
     let alpha = (overlay_alpha * 255.0) as u8;
+    let delta = 22i16;
     let bg_color = if avg_brightness > 128.0 {
         Rgba([
-            (avg_brightness as i16 - 25).clamp(0, 255) as u8,
-            (avg_brightness as i16 - 25).clamp(0, 255) as u8,
-            (avg_brightness as i16 - 25).clamp(0, 255) as u8,
+            (ar as i16 - delta).clamp(0, 255) as u8,
+            (ag as i16 - delta).clamp(0, 255) as u8,
+            (ab as i16 - delta).clamp(0, 255) as u8,
             alpha,
         ])
     } else {
         Rgba([
-            (avg_brightness as i16 + 25).clamp(0, 255) as u8,
-            (avg_brightness as i16 + 25).clamp(0, 255) as u8,
-            (avg_brightness as i16 + 25).clamp(0, 255) as u8,
+            (ar as i16 + delta).clamp(0, 255) as u8,
+            (ag as i16 + delta).clamp(0, 255) as u8,
+            (ab as i16 + delta).clamp(0, 255) as u8,
             alpha,
         ])
     };

@@ -2,7 +2,8 @@ use strsim::levenshtein;
 
 use crate::ocr::OcrWord;
 
-const LINE_Y_THRESHOLD: i32 = 10;
+/// Допуск по Y для слияния слов в одну строку (чуть выше — меньше дублей строк и перекрытий боксов).
+const LINE_Y_THRESHOLD: i32 = 13;
 const MAX_WORD_GAP: i32 = 20;
 const MAX_LEV_DISTANCE: usize = 2;
 

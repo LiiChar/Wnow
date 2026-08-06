@@ -2,8 +2,8 @@ pub mod local;
 mod translation;
 
 pub use translation::{
-    get_translation_mode, set_translation_mode, translate, translate_batch, translate_words_batch,
-    TranslationMode,
+    get_translation_mode, set_translation_mode, translate, translate_batch,
+    translate_ordered_fragments_with_context, translate_words_batch, TranslationMode,
 };
 
 pub use local::get_translate_lang;

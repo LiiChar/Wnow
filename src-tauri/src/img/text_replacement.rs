@@ -118,6 +118,28 @@ struct BoxProcessResult {
 }
 
 // ============================================================================
+// GEOMETRY
+// ============================================================================
+
+/// Сжимает высоту бокса, если нижний край заходит на следующую строку (после сортировки по чтению).
+fn apply_vertical_overlap_shrink(boxes: &mut [TranslatedBox]) {
+    if boxes.len() < 2 {
+        return;
+    }
+    const GAP: i32 = 2;
+    for i in 0..boxes.len() - 1 {
+        let next_top = boxes[i + 1].y;
+        let bottom = boxes[i].y + boxes[i].height;
+        if bottom > next_top - GAP {
+            let new_h = next_top - GAP - boxes[i].y;
+            if new_h >= 6 {
+                boxes[i].height = new_h;
+            }
+        }
+    }
+}
+
+// ============================================================================
 // PUBLIC API
 // ============================================================================
 
@@ -148,14 +170,16 @@ pub fn replace_text_in_image(
     let mut total_lines = 0;
     let mut successful_boxes = 0;
 
-    let mut ordered: Vec<&TranslatedBox> = boxes.iter().collect();
-    // Стабильный порядок: сверху вниз, слева направо; при перекрытии позже нарисованный бокс сверху
-    ordered.sort_by(|a, b| {
+    let mut boxes_work: Vec<TranslatedBox> = boxes.to_vec();
+    boxes_work.sort_by(|a, b| {
         a.y
             .cmp(&b.y)
             .then_with(|| a.x.cmp(&b.x))
             .then_with(|| a.width.cmp(&b.width))
     });
+    apply_vertical_overlap_shrink(&mut boxes_work);
+
+    let ordered: Vec<&TranslatedBox> = boxes_work.iter().collect();
 
     // Обрабатываем каждый бокс
     for box_item in ordered {
@@ -260,8 +284,8 @@ fn process_single_box(
         box_item,
     );
 
-    // --- Шаг 7: Определяем цвет текста и фона ---
-    let (text_color, bg_color) = determine_text_and_bg_colors(&cropped, params.overlay_alpha);
+    let (text_color, bg_color) =
+        determine_text_and_bg_colors(&cropped, params.overlay_alpha);
 
     // --- Шаг 8: Рисуем подложку в области бокса (без паддинга) ---
     draw_background_rect(
@@ -272,6 +296,8 @@ fn process_single_box(
         box_item.height as u32,
         bg_color,
     );
+
+
 
     // --- Шаг 9: Вычисляем оптимальный размер шрифта ---
     let available_width = box_item.width as f32 - 2.0 * params.text_padding as f32;

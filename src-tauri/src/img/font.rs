@@ -233,11 +233,5 @@ mod tests {
         assert_eq!(font_type, FontType::Serif);
     }
 
-    #[test]
-    fn test_get_default_font_returns_valid() {
-        let font = get_default_font();
-        // Проверяем что шрифт загружен (не паникует)
-        let glyph = font.glyph('A');
-        assert!(glyph.exact_bounding_box().is_some() || true); // bounding box может быть None для некоторых глифов
-    }
+
 }

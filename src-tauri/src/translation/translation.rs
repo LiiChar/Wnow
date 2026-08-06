@@ -139,6 +139,92 @@ pub async fn translate_batch(
     Ok(results)
 }
 
+/// Переводит строки в порядке чтения так, чтобы переводчик видел соседнюю строку (склонения, анафоры).
+///
+/// Сначала пробуем один запрос с `\n` между строками; если число строк не совпало — пары
+/// «предыдущая + текущая» с взятием последней строки ответа.
+pub async fn translate_ordered_fragments_with_context(
+    fragments: Vec<String>,
+    from: &str,
+    to: &str,
+) -> Result<Vec<String>, TranslateError> {
+    let n = fragments.len();
+    if n == 0 {
+        return Ok(vec![]);
+    }
+    if n == 1 {
+        return translate(fragments[0].clone(), from, to).await.map(|s| vec![s]);
+    }
+
+    let can_batch = fragments.iter().all(|s| !s.contains('\n'));
+
+    if can_batch {
+        let joined = fragments.join("\n");
+        if let Ok(tr_block) = translate(joined, from, to).await {
+            let parts: Vec<String> = tr_block
+                .lines()
+                .map(|l| l.trim_end().to_string())
+                .collect();
+            if parts.len() == n {
+                return Ok(parts);
+            }
+        }
+    }
+
+    translate_fragments_pairwise_context(fragments, from, to).await
+}
+
+async fn translate_fragments_pairwise_context(
+    fragments: Vec<String>,
+    from: &str,
+    to: &str,
+) -> Result<Vec<String>, TranslateError> {
+    let n = fragments.len();
+    let mut out = Vec::with_capacity(n);
+
+    for i in 0..n {
+        if fragments[i].trim().is_empty() {
+            out.push(String::new());
+            continue;
+        }
+
+        let request = if i == 0 {
+            fragments[i].clone()
+        } else if fragments[i - 1].trim().is_empty() {
+            fragments[i].clone()
+        } else {
+            format!(
+                "{}\n{}",
+                fragments[i - 1].trim_end(),
+                fragments[i].trim_end()
+            )
+        };
+
+        let tr = translate(request, from, to).await?;
+        let lines: Vec<&str> = tr
+            .lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty())
+            .collect();
+
+        let piece = if i == 0 {
+            if lines.len() <= 1 {
+                tr.trim().to_string()
+            } else {
+                lines.join(" ")
+            }
+        } else if lines.len() >= 2 {
+            lines[lines.len() - 1].to_string()
+        } else {
+            tr.trim().to_string()
+        };
+
+        out.push(piece);
+    }
+
+    Ok(out)
+}
+
 pub async fn translate_words_batch(
     words: Vec<String>,
     from: &str,

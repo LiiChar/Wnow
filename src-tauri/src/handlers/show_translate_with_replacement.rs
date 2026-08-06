@@ -10,7 +10,7 @@ use crate::img::{ocr_word_to_translated_box, replace_text_in_image, TextReplacem
 use crate::ocr::{postprocess_ocr, preprocess_for_tesseract_sys, recognize_with_boxes, OcrWord};
 use crate::platform::set_window_topmost;
 use crate::translation::local::get_translate_lang;
-use crate::translation::translate;
+use crate::translation::{translate, translate_ordered_fragments_with_context};
 
 /// Один фрагмент (картинка + позиция)
 #[derive(serde::Serialize, Clone, Debug)]
@@ -99,32 +99,47 @@ pub async fn show_translate_with_replacement(app: &AppHandle) {
         return;
     }
 
-    // 4. Translate
-    let translate_requests: Vec<String> = boxes.iter().map(|b| b.text.clone()).collect();
-
+    // 4. Translate (строки с контекстом соседней строки для согласованных переводов)
     let (source_lang, target_lang) = get_translate_lang();
 
-    let results = join_all(
-        translate_requests
-            .iter()
-            .map(|text| translate(text.clone(), &source_lang, &target_lang)),
+    let mut sorted_ix: Vec<usize> = (0..boxes.len()).collect();
+    sorted_ix.sort_by_key(|&i| (boxes[i].y, boxes[i].x));
+    let ordered_texts: Vec<String> = sorted_ix.iter().map(|&i| boxes[i].text.clone()).collect();
+
+    let line_translations: Vec<String> = match translate_ordered_fragments_with_context(
+        ordered_texts,
+        &source_lang,
+        &target_lang,
     )
-    .await;
+    .await
+    {
+        Ok(v) if v.len() == sorted_ix.len() => v,
+        _ => join_all(
+            sorted_ix
+                .iter()
+                .map(|&i| translate(boxes[i].text.clone(), &source_lang, &target_lang)),
+        )
+        .await
+        .into_iter()
+        .filter_map(|r| r.ok())
+        .collect(),
+    };
 
-    let mut translated_boxes: Vec<TranslatedBox> = Vec::with_capacity(boxes.len());
-
-    for (i, result) in results.into_iter().enumerate() {
-        if let Ok(translated) = result {
-            let original = &boxes[i];
-            translated_boxes.push(ocr_word_to_translated_box(
-                original.x,
-                original.y,
-                original.w,
-                original.h,
-                &original.text,
-                &translated,
-            ));
-        }
+    let mut translated_boxes: Vec<TranslatedBox> = Vec::with_capacity(sorted_ix.len());
+    for (ord, &i) in sorted_ix.iter().enumerate() {
+        let translated = line_translations
+            .get(ord)
+            .cloned()
+            .unwrap_or_else(|| boxes[i].text.clone());
+        let original = &boxes[i];
+        translated_boxes.push(ocr_word_to_translated_box(
+            original.x,
+            original.y,
+            original.w,
+            original.h,
+            &original.text,
+            &translated,
+        ));
     }
 
     if translated_boxes.is_empty() {
